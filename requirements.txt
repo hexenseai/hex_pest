@@ -1,0 +1,6 @@
+Django>=5.0
+django-unfold
+openpyxl
+Pillow
+reportlab
+qrcode[pil]

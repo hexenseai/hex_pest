@@ -1,0 +1,146 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Kale İlaçlama{% endblock %}</title>
+    {% block meta %}{% endblock %}
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotdJ08HHNDC2VMG3Gt3gGjOA/vuRk5cT+W2+3VJ5k8n+L7nWP2rDP2jVz" crossorigin="anonymous"></script>
+    <link href="https://unpkg.com/tabulator-tables@6.3.1/dist/css/tabulator.min.css" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/tabulator-tables@6.3.1/dist/js/tabulator.min.js"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased min-h-screen flex flex-col">
+    {# Header #}
+    <header class="h-14 flex-shrink-0 bg-white border-b border-gray-200 flex items-center px-4">
+        <div class="flex items-center justify-between w-full">
+            <div class="flex items-center gap-3">
+                <button type="button" id="sidebar-toggle" aria-label="Menüyü aç/kapat"
+                        class="p-2 rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <svg id="sidebar-icon-open" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                    <svg id="sidebar-icon-close" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+                <a href="{% url 'home' %}" class="text-lg font-semibold text-gray-800">Kale İlaçlama</a>
+            </div>
+            <div class="flex items-center gap-4">
+                <span class="text-sm text-gray-600">{{ user.get_username }}</span>
+                <form method="post" action="{% url 'logout' %}" class="inline">
+                    {% csrf_token %}
+                    <button type="submit" class="text-sm text-blue-600 hover:underline bg-transparent border-0 p-0 cursor-pointer">Çıkış</button>
+                </form>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        {# Left sidebar - daralıp genişleyebilir #}
+        <aside id="sidebar"
+               class="flex-shrink-0 w-64 bg-white border-r border-gray-200 transition-all duration-300 ease-in-out overflow-hidden flex flex-col"
+               data-expanded="true">
+            <nav class="p-3 flex-1 overflow-y-auto min-w-0">
+                <ul class="space-y-1">
+                    <li>
+                        <a href="{% url 'home' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
+                            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                            </svg>
+                            <span class="sidebar-text whitespace-nowrap">Ana Sayfa</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'customer_list' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
+                            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                            </svg>
+                            <span class="sidebar-text whitespace-nowrap">Müşteriler</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'facility_list' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100">
+                            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            </svg>
+                            <span class="sidebar-text whitespace-nowrap">Tesisler</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{% url 'admin:index' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-md text-gray-700 hover:bg-gray-100" target="_blank">
+                            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            <span class="sidebar-text whitespace-nowrap">Admin</span>
+                        </a>
+                    </li>
+                    {% block sidebar_items %}{% endblock %}
+                </ul>
+            </nav>
+        </aside>
+
+        {# Content alanı #}
+        <main class="flex-1 overflow-auto p-6">
+            {% if messages %}
+                <ul class="mb-4 space-y-2">
+                    {% for message in messages %}
+                        <li class="p-3 rounded-md {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'success' %}bg-green-100 text-green-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ message }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        (function () {
+            var STORAGE_KEY = 'kale-sidebar-expanded';
+            var sidebar = document.getElementById('sidebar');
+            var toggle = document.getElementById('sidebar-toggle');
+            var iconOpen = document.getElementById('sidebar-icon-open');
+            var iconClose = document.getElementById('sidebar-icon-close');
+
+            function isExpanded() {
+                return sidebar.getAttribute('data-expanded') === 'true';
+            }
+
+            function setExpanded(expanded) {
+                sidebar.setAttribute('data-expanded', expanded ? 'true' : 'false');
+                if (expanded) {
+                    sidebar.classList.remove('w-16');
+                    sidebar.classList.add('w-64');
+                    iconOpen.classList.remove('hidden');
+                    iconClose.classList.add('hidden');
+                } else {
+                    sidebar.classList.remove('w-64');
+                    sidebar.classList.add('w-16');
+                    iconOpen.classList.add('hidden');
+                    iconClose.classList.remove('hidden');
+                }
+                try { localStorage.setItem(STORAGE_KEY, expanded ? '1' : '0'); } catch (e) {}
+            }
+
+            function init() {
+                var saved = null;
+                try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+                var startExpanded = saved === null ? true : saved === '1';
+                setExpanded(startExpanded);
+            }
+
+            if (toggle && sidebar) {
+                init();
+                toggle.addEventListener('click', function () {
+                    setExpanded(!isExpanded());
+                });
+            }
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

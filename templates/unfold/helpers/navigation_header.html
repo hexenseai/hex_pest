@@ -1,0 +1,38 @@
+{% load i18n unfold %}
+
+<div class="border-b border-base-200 flex gap-3 items-center h-[65px] mb-6 dark:border-base-800 px-3 {% element_classes 'navigation_header' %}" {% if site_dropdown %}x-data="{ openDropdown: false }"{% endif %}>
+    <div class="bg-transparent flex font-semibold gap-3 grow min-w-0 h-[64px] items-center px-3 {% if site_dropdown %}cursor-pointer transition-all -mx-3 px-6 hover:bg-base-100 dark:hover:bg-white/[.06]{% endif %}"
+         {% if site_dropdown %}
+             x-on:click="openDropdown = !openDropdown"
+             x-bind:class="{'bg-base-100 dark:bg-white/[.06]': openDropdown, 'bg-transparent': !openDropdown}"
+         {% endif %}
+    >
+        {% if site_logo %}
+            <a href="{% url 'admin:index' %}" class="flex items-center gap-3 shrink-0">
+                {% if site_logo.light and site_logo.dark %}
+                    <img src="{{ site_logo.dark }}" alt="{% trans 'Home' %}" class="h-8 hidden dark:block"/>
+                    <img src="{{ site_logo.light }}" alt="{% trans 'Home' %}" class="block h-8 dark:hidden" />
+                {% else %}
+                    <img src="{{ site_logo }}" class="h-8" alt="{% trans 'Home' %}" />
+                {% endif %}
+                {% if site_header %}
+                    <span class="text-font-important-light dark:text-font-important-dark truncate font-bold uppercase text-lg">{{ site_header|default:_('Django administration') }}</span>
+                {% endif %}
+            </a>
+        {% elif branding %}
+            {% include "unfold/helpers/site_icon.html" %}
+        {% endif %}
+
+        {% if site_dropdown %}
+            <span class="material-symbols-outlined ml-auto select-none text-font-default-light dark:text-font-default-dark">
+                unfold_more
+            </span>
+        {% endif %}
+    </div>
+
+    <span class="material-symbols-outlined block cursor-pointer h-[18px] xl:hidden! hover:text-base-700 dark:hover:text-base-200" x-on:click="sidebarMobileOpen = !sidebarMobileOpen">
+        close
+    </span>
+
+    {% include "unfold/helpers/site_dropdown.html" %}
+</div>

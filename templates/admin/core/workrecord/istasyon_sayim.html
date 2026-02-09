@@ -1,0 +1,276 @@
+{% extends "unfold/layouts/base_simple.html" %}
+{% load i18n unfold %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    {% include "unfold/helpers/messages.html" %}
+
+    <div class="mb-6 flex flex-wrap items-center gap-4">
+        <a href="{% url 'admin:core_workrecord_change' work_record.pk %}" class="text-primary-600 hover:underline">
+            ← İş kaydına dön
+        </a>
+        <h1 class="text-xl font-semibold">{{ title }}</h1>
+    </div>
+
+    {% if locked %}
+    <div class="p-4 mb-6 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+        Bitiş saati girildiği için sayım kilitlendi. Ekleneme veya değişiklik yapılamaz.
+    </div>
+    {% endif %}
+
+    <div class="mb-6 p-4 rounded-lg bg-base-100 dark:bg-base-800 border border-base-200 dark:border-base-700">
+        <p class="text-base-font-medium-light dark:text-base-font-medium-dark">
+            {{ work_record.tarih }} — {{ work_record.personel.get_username }}{% if work_record.ekip %} ({{ work_record.ekip }}){% endif %}
+            {% if work_record.baslama_saati %} {{ work_record.baslama_saati }}{% endif %}
+            {% if work_record.bitis_saati %} – {{ work_record.bitis_saati }}{% endif %}
+        </p>
+    {% if summary_facility or summary_zone %}
+        {% if summary_facility and selected_facility %}
+        <p class="mb-1">
+            <strong>Tesis ({{ selected_facility }}):</strong>
+            Toplam {{ summary_facility.toplam }} istasyon, {{ summary_facility.girilen }} giriş yapıldı, <strong>{{ summary_facility.kalan }} kalan</strong>
+        </p>
+        {% endif %}
+        {% if summary_zone %}
+        <p>
+            <strong>Bölge:</strong>
+            Toplam {{ summary_zone.toplam }} istasyon, {{ summary_zone.girilen }} giriş yapıldı, <strong>{{ summary_zone.kalan }} kalan</strong>
+        </p>
+        {% endif %}
+    {% endif %}
+    </div>
+
+
+    <div class="grid gap-6 md:grid-cols-2">
+        <section class="p-4 rounded-lg border border-base-200 dark:border-base-700 bg-base-50 dark:bg-base-800 md:min-h-0">
+            <h2 class="text-lg font-semibold mb-4">İstasyon sayım girişi</h2>
+            <p class="text-sm text-base-font-muted-light dark:text-base-font-muted-dark mb-3">
+                QR okutun veya benzersiz kodu yazın, ardından sayım değerini girin.
+            </p>
+            {% if not locked %}
+            <div id="tek-giris-form" class="space-y-4 tek-giris-buyuk">
+                <div class="w-full max-w-full">
+                    <label for="benzersiz_kod" class="block text-base font-medium mb-2">İstasyon Kodu</label>
+                    <div class="w-full">
+                        <input type="text" id="benzersiz_kod" placeholder="MÜŞTERİ-TESİS-BÖLGE-İSTASYON"
+                            class="w-full box-border text-xl px-5 py-4 rounded-xl border border-base-300 dark:border-base-600 bg-white dark:bg-base-900 dark:text-base-font-default-dark focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            autocomplete="off">
+                        <div class="flex gap-2 mt-2 w-full">
+                            <button type="button" id="qr-oku-btn" title="QR kod oku"
+                                class="flex-1 min-w-0 py-3 rounded-xl bg-base-200 dark:bg-base-600 text-base-font-default-light dark:text-base-font-default-dark hover:bg-base-300 dark:hover:bg-base-500 font-medium focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                QR oku
+                            </button>
+                            <button type="button" id="lookup-btn"
+                                class="flex-1 min-w-0 py-3 rounded-xl bg-primary-600 text-white hover:bg-primary-700 font-semibold focus:outline-none focus:ring-2 focus:ring-primary-400">
+                                Bul
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div id="station-info" class="hidden p-4 rounded-xl bg-base-200 dark:bg-base-700 text-xl"></div>
+                <form method="post" action="{{ istasyon_sayim_url }}" id="sayim-save-form" class="hidden space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save">
+                    <input type="hidden" name="station_id" id="station_id" value="">
+                    <div>
+                        <label for="sayim_degeri" class="block text-base font-medium mb-2">Sayım değeri</label>
+                        <input type="number" id="sayim_degeri" name="sayim_degeri" value="0"
+                            class="tek-giris-input text-xl px-5 py-4 border rounded-xl w-full md:w-48 dark:bg-base-900 dark:border-base-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            step="1" inputmode="numeric" min="0">
+                    </div>
+                    <div>
+                        <label for="not_alani" class="block text-base font-medium mb-2">Not (isteğe bağlı)</label>
+                        <input type="text" id="not_alani" name="not_alani" maxlength="200"
+                            class="tek-giris-input w-full text-xl max-w-full px-5 py-4 border rounded-xl dark:bg-base-900 dark:border-base-600 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    </div>
+                    <button type="submit"
+                        class="w-full md:w-auto px-6 py-4 rounded-xl bg-primary-600 text-white hover:bg-primary-700 text-lg font-semibold transition-colors">
+                        Kaydet
+                    </button>
+                </form>
+            </div>
+            {% else %}
+            <p class="text-base-font-muted-light dark:text-base-font-muted-dark">Sayım kilitli.</p>
+            {% endif %}
+        </section>
+
+        <section class="p-4 rounded-lg border border-base-200 dark:border-base-700 bg-base-50 dark:bg-base-800 flex flex-col md:min-h-0">
+            <h2 class="text-lg font-semibold mb-4 flex-shrink-0">Toplu liste</h2>
+            <form method="get" action="{{ istasyon_sayim_url }}" class="flex flex-wrap gap-3 items-end flex-shrink-0 mb-4">
+                <div>
+                    <label for="facility" class="block text-sm font-medium mb-1">Tesis</label>
+                    <select name="facility" id="facility" class="px-3 py-2 border rounded-md dark:bg-base-900 dark:border-base-600 min-w-[200px]">
+                        <option value="">— Seçin —</option>
+                        {% for f in facilities %}
+                        <option value="{{ f.pk }}" {% if selected_facility and f.pk == selected_facility.pk %}selected{% endif %}>
+                            {{ f.customer.kod }}-{{ f.kod }} {{ f.ad }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% if selected_facility and zones %}
+                <div>
+                    <label for="zone" class="block text-sm font-medium mb-1">Bölge</label>
+                    <select name="zone" id="zone" class="px-3 py-2 border rounded-md dark:bg-base-900 dark:border-base-600 min-w-[150px]">
+                        <option value="">Tümü</option>
+                        {% for z in zones %}
+                        <option value="{{ z.pk }}" {% if selected_zone_id == z.pk|stringformat:"d" %}selected{% endif %}>{{ z.kod }} {{ z.ad }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+                <button type="submit" class="px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 text-sm">Listele</button>
+            </form>
+
+            <div class="flex-1 min-h-0 flex flex-col">
+            {% if not selected_facility %}
+            <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm">Tesis seçip "Listele" ile istasyonları görüntüleyin.</p>
+            {% elif bulk_stations %}
+            {% if not locked %}
+            <form method="post" action="{{ istasyon_sayim_url }}" class="flex flex-col flex-1 min-h-0">
+                {% csrf_token %}
+                <div class="overflow-auto flex-1 min-h-0">
+                <table class="w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="border-b border-base-200 dark:border-base-600">
+                            <th class="text-left py-2 px-2">İstasyon</th>
+                            <th class="text-left py-2 px-2">Bölge</th>
+                            <th class="text-left py-2 px-2 w-28">Sayım</th>
+                            <th class="text-left py-2 px-2">Not</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in bulk_stations %}
+                        <tr class="border-b border-base-100 dark:border-base-700 {% if row.count_obj %}bg-green-50 dark:bg-green-900/20{% endif %}">
+                            <td class="py-2 px-2">{{ row.station.benzersiz_kod }} — {{ row.station.ad }}</td>
+                            <td class="py-2 px-2">{{ row.station.zone.kod }}</td>
+                            <td class="py-2 px-2">
+                                <input type="number" name="station_{{ row.station.pk }}" value="{% if row.count_obj %}{{ row.count_obj.sayim_degeri }}{% else %}0{% endif %}" step="1" inputmode="numeric" min="0" class="w-28 px-2 py-1.5 border rounded dark:bg-base-900 dark:border-base-600">
+                            </td>
+                            <td class="py-2 px-2">
+                                <input type="text" name="not_{{ row.station.pk }}" value="{% if row.count_obj %}{{ row.count_obj.not_alani }}{% endif %}" class="w-full max-w-xs px-2 py-1 border rounded dark:bg-base-900 dark:border-base-600" placeholder="Not">
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                <input type="hidden" name="action" value="save_bulk">
+                <button type="submit" class="mt-4 px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 flex-shrink-0">Toplu kaydet</button>
+            </form>
+            {% else %}
+            <div class="overflow-auto flex-1 min-h-0">
+            <table class="w-full text-sm border-collapse">
+                <thead>
+                    <tr class="border-b border-base-200 dark:border-base-600">
+                        <th class="text-left py-2 px-2">İstasyon</th>
+                        <th class="text-left py-2 px-2">Bölge</th>
+                        <th class="text-left py-2 px-2">Sayım</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in bulk_stations %}
+                    <tr class="border-b border-base-100 dark:border-base-700 {% if row.count_obj %}bg-green-50 dark:bg-green-900/20{% endif %}">
+                        <td class="py-2 px-2">{{ row.station.benzersiz_kod }} — {{ row.station.ad }}</td>
+                        <td class="py-2 px-2">{{ row.station.zone.kod }}</td>
+                        <td class="py-2 px-2">{% if row.count_obj %}{{ row.count_obj.sayim_degeri }}{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            {% endif %}
+            {% else %}
+            <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm">Bu tesis/bölgede istasyon yok.</p>
+            {% endif %}
+            </div>
+        </section>
+    </div>
+</div>
+
+<div id="qr-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 hidden">
+    <div class="bg-white dark:bg-base-800 rounded-xl shadow-xl max-w-md w-full p-4">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="text-lg font-semibold">QR kod okut</h3>
+            <button type="button" id="qr-modal-kapat" class="px-3 py-1 rounded-lg bg-base-200 dark:bg-base-600 hover:bg-base-300 dark:hover:bg-base-500">Kapat</button>
+        </div>
+        <div id="qr-reader" class="rounded-lg overflow-hidden"></div>
+        <p class="text-sm text-base-font-muted-light dark:text-base-font-muted-dark mt-2">QR kodu kameraya tutun. Okutulunca otomatik devam eder.</p>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+(function() {
+    var form = document.getElementById('tek-giris-form');
+    if (!form) return;
+    var benzersizInput = document.getElementById('benzersiz_kod');
+    var lookupBtn = document.getElementById('lookup-btn');
+    var stationInfo = document.getElementById('station-info');
+    var sayimForm = document.getElementById('sayim-save-form');
+    var stationIdInput = document.getElementById('station_id');
+    var sayimInput = document.getElementById('sayim_degeri');
+    var qrModal = document.getElementById('qr-modal');
+    var qrOkuBtn = document.getElementById('qr-oku-btn');
+    var qrModalKapat = document.getElementById('qr-modal-kapat');
+    var qrReaderEl = document.getElementById('qr-reader');
+    var qrScanner = null;
+
+    function doLookup() {
+        var kod = (benzersizInput && benzersizInput.value) ? benzersizInput.value.trim() : '';
+        if (!kod) return;
+        var url = '{{ istasyon_sayim_url }}?benzersiz_kod=' + encodeURIComponent(kod);
+        fetch(url, { headers: { 'Accept': 'application/json' } })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(r); })
+            .then(function(data) {
+                if (data.found) {
+                    stationInfo.innerHTML = 'İstasyon: <strong>' + (data.ad || data.benzersiz_kod) + '</strong> — ' + data.benzersiz_kod + ' (Tesis: ' + data.facility_kod + ', Bölge: ' + data.zone_kod + ')';
+                    stationInfo.classList.remove('hidden');
+                    if (stationIdInput) stationIdInput.value = data.id;
+                    if (sayimForm) sayimForm.classList.remove('hidden');
+                    if (sayimInput) sayimInput.focus();
+                } else {
+                    stationInfo.innerHTML = 'İstasyon bulunamadı.';
+                    stationInfo.classList.remove('hidden');
+                    if (sayimForm) sayimForm.classList.add('hidden');
+                }
+            })
+            .catch(function() {
+                stationInfo.innerHTML = 'Arama yapılamadı veya istasyon bulunamadı.';
+                stationInfo.classList.remove('hidden');
+                if (sayimForm) sayimForm.classList.add('hidden');
+            });
+    }
+
+    function qrModalGoster() {
+        if (!qrModal || !qrReaderEl) return;
+        qrModal.classList.remove('hidden');
+        qrReaderEl.innerHTML = '';
+        if (typeof Html5Qrcode !== 'undefined') {
+            qrScanner = new Html5Qrcode('qr-reader');
+            qrScanner.start({ facingMode: 'environment' }, { fps: 5, qrbox: { width: 200, height: 200 } }, function(decodedText) {
+                if (benzersizInput) benzersizInput.value = decodedText;
+                qrScanner.stop().then(function() { if (qrScanner) qrScanner.clear(); qrScanner = null; }).catch(function() {});
+                qrModal.classList.add('hidden');
+                doLookup();
+            }, function() {});
+        }
+    }
+
+    function qrModalKapatFn() {
+        if (qrScanner) {
+            qrScanner.stop().then(function() { if (qrScanner) qrScanner.clear(); qrScanner = null; }).catch(function() {});
+        }
+        if (qrModal) qrModal.classList.add('hidden');
+    }
+
+    if (lookupBtn) lookupBtn.addEventListener('click', doLookup);
+    if (benzersizInput) benzersizInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); doLookup(); } });
+    if (qrOkuBtn) qrOkuBtn.addEventListener('click', qrModalGoster);
+    if (qrModalKapat) qrModalKapat.addEventListener('click', qrModalKapatFn);
+    if (qrModal) qrModal.addEventListener('click', function(e) { if (e.target === qrModal) qrModalKapatFn(); });
+})();
+</script>
+{% endblock %}

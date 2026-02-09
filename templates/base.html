@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Kale İlaçlama{% endblock %}</title>
+    {% block meta %}{% endblock %}
+    {# Tailwind CSS - CDN (geliştirme için; production'da build kullanılabilir) #}
+    <script src="https://cdn.tailwindcss.com"></script>
+    {# HTMX #}
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotdJ08HHNDC2VMG3Gt3gGjOA/vuRk5cT+W2+3VJ5k8n+L7nWP2rDP2jVz" crossorigin="anonymous"></script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 text-gray-900 antialiased">
+    <header class="bg-white border-b border-gray-200">
+        <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-14 items-center">
+                <a href="{% url 'admin:index' %}" class="text-lg font-semibold text-gray-800">Kale İlaçlama</a>
+                <div class="flex gap-4">
+                    {% if user.is_authenticated %}
+                        <span class="text-sm text-gray-600">{{ user.get_username }}</span>
+                        <a href="{% url 'admin:logout' %}" class="text-sm text-blue-600 hover:underline">Çıkış</a>
+                    {% else %}
+                        <a href="{% url 'admin:login' %}" class="text-sm text-blue-600 hover:underline">Giriş</a>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {% if messages %}
+            <ul class="mb-4 space-y-2">
+                {% for message in messages %}
+                    <li class="p-3 rounded-md {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'success' %}bg-green-100 text-green-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ message }}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 mt-8 border-t border-gray-200 text-sm text-gray-500">
+        Kale İlaçlama &mdash; Django, Tailwind CSS, HTMX
+    </footer>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

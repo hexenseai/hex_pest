@@ -1,0 +1,121 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto">
+    <nav class="mb-6 text-sm text-base-500 dark:text-base-400">
+        <a href="{% url 'admin:core_facility_changelist' %}" class="hover:text-primary-600 dark:hover:text-primary-500">Tesisler</a>
+        <span class="mx-1">/</span>
+        <a href="{% url 'admin:core_facility_change' facility.pk %}" class="hover:text-primary-600 dark:hover:text-primary-500">{{ facility }}</a>
+        <span class="mx-1">/</span>
+        <span class="text-base-700 dark:text-base-300">İstasyonlar</span>
+    </nav>
+
+    <h1 class="text-xl font-semibold text-base-900 dark:text-base-100 mb-6">{{ title }}</h1>
+
+    <section class="bg-white dark:bg-base-900 rounded-lg border border-base-200 dark:border-base-800 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-base-900 dark:text-base-100 mb-4">Yeni bölge ekle</h2>
+        <form method="post" action="">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add_zone">
+            {% if zone_form_errors %}
+                <div class="text-sm text-red-600 dark:text-red-500 mb-3">
+                    {% for field in zone_form_errors %}{% for err in field.errors %}{{ err }}{% endfor %}{% endfor %}
+                    {% for err in zone_form_errors.non_field_errors %}{{ err }}{% endfor %}
+                </div>
+            {% endif %}
+            <div class="flex flex-wrap items-end gap-3">
+                <div class="min-w-[120px]">
+                    <label for="id_zone_kod" class="block text-sm font-medium text-base-700 dark:text-base-300 mb-1">Kod</label>
+                    <input type="text" name="kod" id="id_zone_kod" maxlength="20" value="{{ zone_form.kod.value|default:'' }}" class="w-full rounded-md border border-base-300 px-3 py-2 text-sm dark:bg-base-800 dark:border-base-700 dark:text-base-100 {% if zone_form_errors and zone_form_errors.kod.errors %}border-red-500{% endif %}" placeholder="Örn. A1">
+                </div>
+                <div class="min-w-[200px]">
+                    <label for="id_zone_ad" class="block text-sm font-medium text-base-700 dark:text-base-300 mb-1">Ad</label>
+                    <input type="text" name="ad" id="id_zone_ad" maxlength="200" value="{{ zone_form.ad.value|default:'' }}" class="w-full rounded-md border border-base-300 px-3 py-2 text-sm dark:bg-base-800 dark:border-base-700 dark:text-base-100 {% if zone_form_errors and zone_form_errors.ad.errors %}border-red-500{% endif %}" placeholder="Bölge adı">
+                </div>
+                <div class="min-w-[180px]">
+                    <label for="id_zone_not" class="block text-sm font-medium text-base-700 dark:text-base-300 mb-1">Not</label>
+                    <input type="text" name="not_alani" id="id_zone_not" value="{{ zone_form.not_alani.value|default:'' }}" class="w-full rounded-md border border-base-300 px-3 py-2 text-sm dark:bg-base-800 dark:border-base-700 dark:text-base-100">
+                </div>
+                <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium">
+                    Bölge ekle
+                </button>
+            </div>
+        </form>
+    </section>
+
+    {% if not zones %}
+        <p class="text-base-600 dark:text-base-400 mb-4">Henüz bölge yok. Yukarıdaki formdan ilk bölgeyi ekleyebilir veya tesis düzenleme sayfasından bölge ekleyebilirsiniz.</p>
+        <a href="{% url 'admin:core_facility_change' facility.pk %}" class="inline-flex items-center px-4 py-2 border border-base-300 dark:border-base-600 rounded-md hover:bg-base-100 dark:hover:bg-base-800 text-sm font-medium text-base-700 dark:text-base-300">
+            Tesis düzenle
+        </a>
+    {% else %}
+        {% for zone in zones %}
+            <section class="bg-white dark:bg-base-900 rounded-lg border border-base-200 dark:border-base-800 p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-base-900 dark:text-base-100">
+                        Bölge: {{ zone.kod }} — {{ zone.ad }}
+                    </h2>
+                    <a href="{% url 'admin:core_zone_change' zone.pk %}" class="text-sm text-primary-600 hover:underline dark:text-primary-500">Bölgeyi düzenle</a>
+                </div>
+
+                <div class="overflow-x-auto mb-4">
+                    {% with istasyonlar=zone.istasyonlar.all %}
+                        {% if istasyonlar %}
+                            <table class="min-w-full divide-y divide-base-200 dark:divide-base-800">
+                                <thead class="bg-base-50 dark:bg-base-800">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-base-500 uppercase">Benzersiz kod</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-base-500 uppercase">Kod</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-base-500 uppercase">Ad</th>
+                                        <th class="px-4 py-2 text-right text-xs font-medium text-base-500 uppercase w-32">İşlem</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-base-200 dark:divide-base-800">
+                                    {% for station in istasyonlar %}
+                                        <tr>
+                                            <td class="px-4 py-2 text-sm text-base-700 dark:text-base-300">{{ station.benzersiz_kod }}</td>
+                                            <td class="px-4 py-2 text-sm text-base-700 dark:text-base-300">{{ station.kod }}</td>
+                                            <td class="px-4 py-2 text-sm text-base-700 dark:text-base-300">{{ station.ad }}</td>
+                                            <td class="px-4 py-2 text-sm text-right">
+                                                <a href="{% url 'admin:core_station_change' station.pk %}" class="text-primary-600 hover:underline dark:text-primary-500 mr-2">Düzenle</a>
+                                                <a href="{% url 'admin:core_station_delete' station.pk %}" class="text-red-600 hover:underline dark:text-red-500">Sil</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p class="text-sm text-base-500 dark:text-base-400 py-2">Bu bölgede istasyon yok.</p>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+
+                <form method="post" action="" class="flex flex-wrap items-end gap-3 pt-4 border-t border-base-200 dark:border-base-800">
+                    {% csrf_token %}
+                    <input type="hidden" name="zone_id" value="{{ zone.pk }}">
+                    {% if add_form_errors and add_form_zone_id == zone.pk %}
+                        <div class="w-full text-sm text-red-600 dark:text-red-500 mb-2">
+                            {% for field in add_form_errors %}{% for err in field.errors %}{{ err }}{% endfor %}{% endfor %}
+                            {% for err in add_form_errors.non_field_errors %}{{ err }}{% endfor %}
+                        </div>
+                    {% endif %}
+                    <div class="min-w-[120px]">
+                        <label for="id_kod_{{ zone.pk }}" class="block text-sm font-medium text-base-700 dark:text-base-300 mb-1">Kod</label>
+                        <input type="text" name="kod" id="id_kod_{{ zone.pk }}" maxlength="20" value="{% if add_form_errors and add_form_zone_id == zone.pk %}{{ add_form_errors.kod.value|default:'' }}{% endif %}" class="w-full rounded-md border border-base-300 px-3 py-2 text-sm dark:bg-base-800 dark:border-base-700 dark:text-base-100 {% if add_form_errors and add_form_zone_id == zone.pk and add_form_errors.kod.errors %}border-red-500{% endif %}" placeholder="Kod">
+                    </div>
+                    <div class="min-w-[200px]">
+                        <label for="id_ad_{{ zone.pk }}" class="block text-sm font-medium text-base-700 dark:text-base-300 mb-1">Ad</label>
+                        <input type="text" name="ad" id="id_ad_{{ zone.pk }}" maxlength="150" value="{% if add_form_errors and add_form_zone_id == zone.pk %}{{ add_form_errors.ad.value|default:'' }}{% endif %}" class="w-full rounded-md border border-base-300 px-3 py-2 text-sm dark:bg-base-800 dark:border-base-700 dark:text-base-100 {% if add_form_errors and add_form_zone_id == zone.pk and add_form_errors.ad.errors %}border-red-500{% endif %}" placeholder="İstasyon adı">
+                    </div>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium">
+                        Bu bölgeye istasyon ekle
+                    </button>
+                </form>
+            </section>
+        {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

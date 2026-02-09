@@ -1,0 +1,91 @@
+{% extends "unfold/layouts/base_simple.html" %}
+{% load i18n unfold %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto {% if rapor_rows is not None %}max-w-full px-2{% else %}max-w-2xl{% endif %}">
+    {% include "unfold/helpers/messages.html" %}
+    <h1 class="text-xl font-semibold mb-4">{{ title }}</h1>
+    <p class="text-sm text-base-font-muted-light dark:text-base-font-muted-dark mb-6">
+        Bir tesis ve tarih aralığı seçin. Excel dosyasında bölüm bazında istasyonlar listelenir;
+        her iş kaydı tarihi bir sütun başlığı olur, hücrelerde sayım değerleri yer alır.
+    </p>
+    <form method="post" action="" class="space-y-4">
+        {% csrf_token %}
+        {% if form.non_field_errors %}
+            <div class="p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 text-sm">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+        <div>
+            <label for="id_tesis" class="block text-sm font-medium mb-1">{{ form.tesis.label }}</label>
+            {{ form.tesis }}
+            {% if form.tesis.errors %}
+                <p class="text-red-600 text-sm mt-1">{{ form.tesis.errors.0 }}</p>
+            {% endif %}
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label for="id_baslangic_tarihi" class="block text-sm font-medium mb-1">{{ form.baslangic_tarihi.label }}</label>
+                {{ form.baslangic_tarihi }}
+                {% if form.baslangic_tarihi.errors %}
+                    <p class="text-red-600 text-sm mt-1">{{ form.baslangic_tarihi.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label for="id_bitis_tarihi" class="block text-sm font-medium mb-1">{{ form.bitis_tarihi.label }}</label>
+                {{ form.bitis_tarihi }}
+                {% if form.bitis_tarihi.errors %}
+                    <p class="text-red-600 text-sm mt-1">{{ form.bitis_tarihi.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="pt-2 flex gap-3">
+            <button type="submit" name="excel" value="1" class="inline-flex items-center px-4 py-2 rounded-md font-medium bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+                Excel İndir
+            </button>
+            <button type="submit" name="ekran" value="1" class="inline-flex items-center px-4 py-2 rounded-md font-medium border border-base-300 dark:border-base-600 bg-base-100 dark:bg-base-800 text-base-font-default-light dark:text-base-font-default-dark hover:bg-base-50 dark:hover:bg-base-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-base-400">
+                Ekranda Göster
+            </button>
+        </div>
+    </form>
+
+    {% if rapor_rows is not None %}
+    <div class="mt-8 overflow-x-auto">
+        <h2 class="text-lg font-semibold mb-2">{{ rapor_musteri_tesis }}</h2>
+        <p class="text-sm text-base-font-muted-light dark:text-base-font-muted-dark mb-4">{{ rapor_adres }}</p>
+        <div class="rounded-lg border border-base-200 dark:border-base-700 overflow-hidden">
+            <table class="w-full text-sm border-collapse">
+                <thead>
+                    <tr class="bg-base-100 dark:bg-base-800 border-b border-base-200 dark:border-base-600">
+                        <th class="text-left py-2 px-3 font-semibold whitespace-nowrap">Bölge</th>
+                        <th class="text-left py-2 px-3 font-semibold whitespace-nowrap">İstasyon Kodu</th>
+                        <th class="text-left py-2 px-3 font-semibold whitespace-nowrap">Açıklama</th>
+                        {% for h in rapor_date_headers %}
+                        <th class="text-center py-2 px-2 font-semibold whitespace-nowrap">{{ h }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in rapor_rows %}
+                    <tr class="border-b border-base-100 dark:border-base-700 hover:bg-base-50 dark:hover:bg-base-800">
+                        <td class="py-2 px-3">{{ row.zone }}</td>
+                        <td class="py-2 px-3">{{ row.kod }}</td>
+                        <td class="py-2 px-3">{{ row.ad }}</td>
+                        {% for c in row.counts %}
+                        <td class="py-2 px-2 text-center">{% if c is not None %}{{ c }}{% else %}—{% endif %}</td>
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="100" class="py-4 px-3 text-center text-base-font-muted-light dark:text-base-font-muted-dark">Bu aralıkta veri yok.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

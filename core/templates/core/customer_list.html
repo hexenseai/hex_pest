@@ -1,0 +1,92 @@
+{% extends "base_app.html" %}
+
+{% block title %}Müşteriler - Kale İlaçlama{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <h1 class="text-2xl font-bold text-gray-900">Müşteriler</h1>
+        <a href="{% url 'customer_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">
+            Müşteri ekle
+        </a>
+    </div>
+
+    {# Arama ve sıralama #}
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+        <form method="get" action="{% url 'customer_list' %}" class="flex flex-wrap items-end gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <label for="q" class="block text-sm font-medium text-gray-700 mb-1">Ara</label>
+                <input type="text" name="q" id="q" value="{{ q }}"
+                       placeholder="Kod, firma ismi..."
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label for="sort" class="block text-sm font-medium text-gray-700 mb-1">Sırala</label>
+                <select name="sort" id="sort" class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+                    {% for key, label in sort_fields.items %}
+                        <option value="{{ key }}" {% if sort == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="order" class="block text-sm font-medium text-gray-700 mb-1">Yön</label>
+                <select name="order" id="order" class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+                    <option value="asc" {% if order == "asc" %}selected{% endif %}>Artan</option>
+                    <option value="desc" {% if order == "desc" %}selected{% endif %}>Azalan</option>
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium">
+                Uygula
+            </button>
+        </form>
+    </div>
+
+    {# Tablo - Tabulator #}
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div id="customer-tabulator"></div>
+        <p id="customer-tabulator-empty" class="px-4 py-8 text-center text-sm text-gray-500 hidden">
+            {% if q %}Arama sonucu müşteri bulunamadı.{% else %}Henüz müşteri yok. "Müşteri ekle" ile ekleyebilirsiniz.{% endif %}
+        </p>
+    </div>
+    {{ table_data|json_script:"customer-table-data" }}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var dataEl = document.getElementById("customer-table-data");
+    var data = dataEl ? JSON.parse(dataEl.textContent) : [];
+    var container = document.getElementById("customer-tabulator");
+    var emptyEl = document.getElementById("customer-tabulator-empty");
+
+    if (data.length === 0) {
+        container.classList.add("hidden");
+        if (emptyEl) emptyEl.classList.remove("hidden");
+        return;
+    }
+    if (emptyEl) emptyEl.classList.add("hidden");
+
+    new Tabulator(container, {
+        data: data,
+        layout: "fitColumns",
+        responsiveLayout: "hide",
+        placeholder: "Kayıt yok",
+        columns: [
+            { title: "Kod", field: "kod", minWidth: 100 },
+            {
+                title: "Firma ismi",
+                field: "firma_ismi",
+                minWidth: 180,
+                formatter: function (cell) {
+                    var d = cell.getRow().getData();
+                    return '<a href="' + d.edit_url + '" class="text-blue-600 hover:underline">' + (d.firma_ismi || "") + "</a>";
+                },
+            },
+            { title: "İletişim", field: "contacts_count", width: 100, hozAlign: "center" },
+            { title: "Tesis sayısı", field: "tesis_count", width: 110, hozAlign: "center" },
+        ],
+    });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,104 @@
+{% extends "base_app.html" %}
+
+{% block title %}Tesisler - Kale İlaçlama{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <h1 class="text-2xl font-bold text-gray-900">Tesisler</h1>
+        <a href="{% url 'facility_create' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">
+            Tesis ekle
+        </a>
+    </div>
+
+    {# Filtre ve arama #}
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+        <form method="get" action="{% url 'facility_list' %}" class="flex flex-wrap items-end gap-4">
+            <div class="min-w-[200px]">
+                <label for="customer" class="block text-sm font-medium text-gray-700 mb-1">Müşteri</label>
+                <select name="customer" id="customer" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                    <option value="">Tümü</option>
+                    {% for c in customers %}
+                        <option value="{{ c.pk }}" {% if customer_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.kod }} — {{ c.firma_ismi }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex-1 min-w-[200px]">
+                <label for="q" class="block text-sm font-medium text-gray-700 mb-1">Ara</label>
+                <input type="text" name="q" id="q" value="{{ q }}"
+                       placeholder="Kod, ad, müşteri..."
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            </div>
+            <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium">
+                Uygula
+            </button>
+        </form>
+    </div>
+
+    {# Tablo - Tabulator #}
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div id="facility-tabulator"></div>
+        <p id="facility-tabulator-empty" class="px-4 py-8 text-center text-sm text-gray-500 hidden">
+            {% if q or customer_id %}Arama sonucu tesis bulunamadı.{% else %}Henüz tesis yok. "Tesis ekle" ile ekleyebilirsiniz.{% endif %}
+        </p>
+    </div>
+    {{ table_data|json_script:"facility-table-data" }}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    var dataEl = document.getElementById("facility-table-data");
+    var data = dataEl ? JSON.parse(dataEl.textContent) : [];
+    var container = document.getElementById("facility-tabulator");
+    var emptyEl = document.getElementById("facility-tabulator-empty");
+
+    if (data.length === 0) {
+        container.classList.add("hidden");
+        if (emptyEl) emptyEl.classList.remove("hidden");
+        return;
+    }
+    if (emptyEl) emptyEl.classList.add("hidden");
+
+    new Tabulator(container, {
+        data: data,
+        layout: "fitColumns",
+        responsiveLayout: "hide",
+        placeholder: "Kayıt yok",
+        columns: [
+            {
+                title: "Müşteri",
+                field: "customer_name",
+                minWidth: 150,
+                formatter: function (cell) {
+                    var d = cell.getRow().getData();
+                    var url = d.customer_edit_url || "#";
+                    return '<a href="' + url + '" class="text-blue-600 hover:underline">' + (d.customer_name || "") + "</a>";
+                },
+            },
+            { title: "Kod", field: "kod", width: 100 },
+            {
+                title: "Tesis adı",
+                field: "ad",
+                minWidth: 180,
+                formatter: function (cell) {
+                    var d = cell.getRow().getData();
+                    return '<a href="' + d.edit_url + '" class="text-blue-600 hover:underline">' + (d.ad || "") + "</a>";
+                },
+            },
+            { title: "İletişim", field: "contacts_count", width: 100, hozAlign: "center" },
+            {
+                title: "",
+                field: "contacts_url",
+                width: 100,
+                formatter: function (cell) {
+                    var url = cell.getValue();
+                    return url ? '<a href="' + url + '" class="text-blue-600 hover:underline">İletişim</a>' : "";
+                },
+            },
+        ],
+    });
+})();
+</script>
+{% endblock %}

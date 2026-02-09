@@ -1,0 +1,18 @@
+<div id="add-zone-form-wrapper" {% if is_oob %}hx-swap-oob="innerHTML"{% endif %}>
+<form method="post" action="{% url 'facility_add_zone' facility.pk %}"
+      id="add-zone-form"
+      hx-post="{% url 'facility_add_zone' facility.pk %}"
+      hx-target="#zone-list"
+      hx-swap="beforeend"
+      hx-on::after-request="if(event.detail.successful) document.getElementById('add-zone-form').reset()"
+      class="flex flex-wrap items-end gap-2 mb-4">
+    {% csrf_token %}
+    {{ form.kod }}
+    {{ form.ad }}
+    {{ form.not_alani }}
+    <button type="submit" class="px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">Bölge ekle</button>
+    {% if form.errors %}
+        <p class="text-sm text-red-600 w-full">{{ form.errors }}</p>
+    {% endif %}
+</form>
+</div>

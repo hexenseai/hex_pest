@@ -1,0 +1,58 @@
+{% extends "unfold/layouts/base_simple.html" %}
+{% load i18n unfold %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block content %}
+<div class="max-w-full mx-auto">
+    {% include "unfold/helpers/messages.html" %}
+    <h1 class="text-xl font-semibold mb-4">{{ title }}</h1>
+    <p class="text-sm text-base-font-muted-light dark:text-base-font-muted-dark mb-4">
+        İş kaydı ve talep bilgileri ile kullanılan ilaç listesi.
+    </p>
+    <div class="overflow-x-auto rounded-lg border border-base-200 dark:border-base-700">
+        <table class="w-full text-sm border-collapse">
+            <thead>
+                <tr class="border-b border-base-200 dark:border-base-600 bg-base-100 dark:bg-base-800">
+                    <th class="text-left py-2 px-3 font-semibold">İlaç (Ticari İsmi)</th>
+                    <th class="text-left py-2 px-3 font-semibold">Temin Firma</th>
+                    <th class="text-left py-2 px-3 font-semibold">Aktif Madde</th>
+                    <th class="text-right py-2 px-3 font-semibold">Miktar</th>
+                    <th class="text-left py-2 px-3 font-semibold">İş Kaydı Tarih</th>
+                    <th class="text-left py-2 px-3 font-semibold">Personel</th>
+                    <th class="text-left py-2 px-3 font-semibold">Ekip</th>
+                    <th class="text-left py-2 px-3 font-semibold">Form No</th>
+                    <th class="text-left py-2 px-3 font-semibold">Talep</th>
+                    <th class="text-left py-2 px-3 font-semibold">Müşteri</th>
+                    <th class="text-left py-2 px-3 font-semibold">Tesis</th>
+                    <th class="text-left py-2 px-3 font-semibold">Talep Tipi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr class="border-b border-base-100 dark:border-base-700 hover:bg-base-50 dark:hover:bg-base-800">
+                    <td class="py-2 px-3">{{ row.ilac_ticari_ismi }}</td>
+                    <td class="py-2 px-3">{{ row.ilac_firma }}</td>
+                    <td class="py-2 px-3">{{ row.ilac_aktif_madde }}</td>
+                    <td class="py-2 px-3 text-right">{{ row.miktar }}</td>
+                    <td class="py-2 px-3">{{ row.is_kaydi_tarih|date:"d.m.Y" }}</td>
+                    <td class="py-2 px-3">{{ row.is_kaydi_personel }}</td>
+                    <td class="py-2 px-3">{{ row.is_kaydi_ekip }}</td>
+                    <td class="py-2 px-3">{{ row.is_kaydi_form_no }}</td>
+                    <td class="py-2 px-3">{{ row.talep }}</td>
+                    <td class="py-2 px-3">{{ row.talep_musteri }}</td>
+                    <td class="py-2 px-3">{{ row.talep_tesis }}</td>
+                    <td class="py-2 px-3">{{ row.talep_tip }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12" class="py-6 px-3 text-center text-base-font-muted-light dark:text-base-font-muted-dark">
+                        Henüz ilaç kullanım kaydı yok.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
