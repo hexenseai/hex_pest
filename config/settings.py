@@ -88,10 +88,19 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-_default_db = f"sqlite:///{BASE_DIR / 'db.sqlite3'}".replace("\\", "/")
-DATABASES = {
-    "default": env.db("DATABASE_URL", default=_default_db)
-}
+_db_url = env.str("DATABASE_URL", default="").strip()
+if _db_url:
+    DATABASES = {"default": env.db("DATABASE_URL")}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+
+# Yeni modeller için varsayılan primary key tipi (Django 3.2+)
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # Password validation
