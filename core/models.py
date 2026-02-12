@@ -326,8 +326,24 @@ class IlacTanim(models.Model):
 
 
 class WorkRecord(models.Model):
-    """İş kaydı (tarih, personel, ekip, başlama/bitiş saati, yapılan uygulamalar detayı, öneriler). Bir talep bu kayıtla kapatılır (1-1)."""
+    """İş kaydı (tarih, personel, ekip, başlama/bitiş saati, yapılan uygulamalar detayı, öneriler). Bir talep bu kayıtla kapatılır (1-1). Müşteri ve tesis doğrudan iş kaydında da tutulabilir; talep zorunlu değildir."""
     tarih = models.DateField("Tarih")
+    customer = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="is_kayitlari",
+        verbose_name="Müşteri",
+    )
+    facility = models.ForeignKey(
+        Facility,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="is_kayitlari",
+        verbose_name="Tesis",
+    )
     personel = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -341,6 +357,20 @@ class WorkRecord(models.Model):
         blank=True,
         related_name="is_kayitlari",
         verbose_name="Ekip",
+    )
+    DURUM_BASLANMADI = "baslanmadi"
+    DURUM_DEVAM_EDIYOR = "devam_ediyor"
+    DURUM_TAMAMLANDI = "tamamlandi"
+    DURUM_CHOICES = [
+        (DURUM_BASLANMADI, "Başlanmadı"),
+        (DURUM_DEVAM_EDIYOR, "Devam Ediyor"),
+        (DURUM_TAMAMLANDI, "Tamamlandı"),
+    ]
+    durum = models.CharField(
+        "Durum",
+        max_length=20,
+        choices=DURUM_CHOICES,
+        default=DURUM_BASLANMADI,
     )
     baslama_saati = models.TimeField("Başlama saati", null=True, blank=True)
     bitis_saati = models.TimeField("Bitiş saati", null=True, blank=True)
@@ -377,7 +407,7 @@ class WorkRecord(models.Model):
         max_length=80,
         blank=True,
         editable=False,
-        help_text="Otomatik: Müşteri kodu-Tesis kodu-YYYYMMDD (kapatılan talep varsa).",
+        help_text="Otomatik: Müşteri kodu-Tesis kodu-YYYYMMDD (iş kaydı veya kapatılan talep üzerinden).",
     )
 
     class Meta:
@@ -393,13 +423,31 @@ class WorkRecord(models.Model):
                 eski_talep_id = eski.kapatilan_talep_id
             except WorkRecord.DoesNotExist:
                 pass
+        # Durum değişince saat otomatik doldur
+        from django.utils import timezone
+        now = timezone.now().time()
+        if self.durum == self.DURUM_DEVAM_EDIYOR and not self.baslama_saati:
+            self.baslama_saati = now
+        if self.durum == self.DURUM_TAMAMLANDI and not self.bitis_saati:
+            self.bitis_saati = now
         self.form_numarasi = ""
+        # Form numarası: önce kapatılan talep, yoksa iş kaydındaki müşteri/tesis
+        customer = None
+        facility = None
         if self.kapatilan_talep_id:
             talep = getattr(self, "_kapatilan_talep_cache", None)
             if talep is None:
                 talep = Talep.objects.select_related("customer", "facility").filter(pk=self.kapatilan_talep_id).first()
             if talep:
-                self.form_numarasi = f"{talep.customer.kod}-{talep.facility.kod}-{self.tarih:%Y%m%d}"
+                customer = talep.customer
+                facility = talep.facility
+        if not customer and self.customer_id:
+            customer = getattr(self, "customer", None) or (Customer.objects.filter(pk=self.customer_id).first() if self.customer_id else None)
+        if not facility and self.facility_id:
+            facility = getattr(self, "facility", None) or (Facility.objects.filter(pk=self.facility_id).first() if self.facility_id else None)
+        if customer:
+            tesis_kod = facility.kod if facility else "-"
+            self.form_numarasi = f"{customer.kod}-{tesis_kod}-{self.tarih:%Y%m%d}"
         super().save(*args, **kwargs)
         if self.kapatilan_talep_id and self.kapatilan_talep.durum != "yapildi":
             self.kapatilan_talep.durum = "yapildi"
@@ -697,9 +745,10 @@ class WorkRecordStationCount(models.Model):
         related_name="sayim_kayitlari",
         verbose_name="İstasyon",
     )
-    sayim_degeri = models.PositiveIntegerField(
-        "Sayım değeri",
-        default=0,
+    tuketim_var = models.BooleanField(
+        "Tüketim var",
+        default=False,
+        help_text="True: tüketim var, False: tüketim yok.",
     )
     not_alani = models.CharField("Not", max_length=200, blank=True)
     created_at = models.DateTimeField("Oluşturulma", auto_now_add=True)
@@ -716,7 +765,57 @@ class WorkRecordStationCount(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.work_record} - {self.station.benzersiz_kod}: {self.sayim_degeri}"
+        return f"{self.work_record} - {self.station.benzersiz_kod}: {'Tüketim var' if self.tuketim_var else 'Tüketim yok'}"
+
+
+class BagimsizTespit(models.Model):
+    """Bağımsız tespit kaydı. Tarih, firma, tesis, yer/gözlem açıklaması, öneriler, raporlandı ve 3 görsel."""
+    tarih = models.DateField("Tarih")
+    firma = models.ForeignKey(
+        Customer,
+        on_delete=models.PROTECT,
+        related_name="bagimsiz_tespitler",
+        verbose_name="Firma",
+    )
+    tesis = models.ForeignKey(
+        Facility,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="bagimsiz_tespitler",
+        verbose_name="Tesis",
+    )
+    yer_aciklamasi = models.TextField("Yer açıklaması", blank=True)
+    gozlem_aciklamasi = models.TextField("Gözlem açıklaması", blank=True)
+    oneriler = models.TextField("Öneriler", blank=True)
+    raporlandi = models.BooleanField("Raporlandı", default=False)
+    gorsel1 = models.ImageField(
+        "Görsel 1",
+        upload_to="bagimsiz_tespit/%Y/%m/",
+        blank=True,
+        null=True,
+    )
+    gorsel2 = models.ImageField(
+        "Görsel 2",
+        upload_to="bagimsiz_tespit/%Y/%m/",
+        blank=True,
+        null=True,
+    )
+    gorsel3 = models.ImageField(
+        "Görsel 3",
+        upload_to="bagimsiz_tespit/%Y/%m/",
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField("Oluşturulma", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Bağımsız tespit"
+        verbose_name_plural = "Bağımsız tespitler"
+        ordering = ["-tarih", "-created_at"]
+
+    def __str__(self):
+        return f"{self.tarih} - {self.firma.kod}"
 
 
 class FaaliyetRaporu(models.Model):

@@ -140,16 +140,16 @@ def _format_date(d):
 
 
 def _draw_istasyon_3_columns(c, y, sayimlar_by_zone, min_y=MARGIN):
-    """İstasyon sayımı: 3 sütun yan yana. Her sütunda bölge başlığı, altında İstasyon No | Sayı listesi."""
+    """İstasyon tüketim: 3 sütun yan yana. Her sütunda bölge başlığı, altında İstasyon No | Tüketim (Var/Yok) listesi."""
     if not sayimlar_by_zone:
         c.setFont(_FONT_BOLD, FONT_SIZE)
-        c.drawString(MARGIN, y, "Bölge ve istasyon sayım sonuçları")
+        c.drawString(MARGIN, y, "Bölge ve istasyon tüketim sonuçları")
         y -= LINE_HEIGHT
         c.setFont(_FONT, FONT_SIZE_SMALL)
         c.drawString(MARGIN, y, "—")
         return y - SECTION_GAP
     c.setFont(_FONT_BOLD, FONT_SIZE)
-    c.drawString(MARGIN, y, "Bölge ve istasyon sayım sonuçları")
+    c.drawString(MARGIN, y, "Bölge ve istasyon tüketim sonuçları")
     y -= ISTASYON_HEADER_H
     col_w = COL_WIDTH
     pad = 2 * mm
@@ -168,12 +168,12 @@ def _draw_istasyon_3_columns(c, y, sayimlar_by_zone, min_y=MARGIN):
             c.drawString(x, y, (zone_name or "—")[:22])
             yy = y - ISTASYON_ROW_H
             c.setFont(_FONT, ISTASYON_FONT)
-            for st_kod, sayim in sayimlar_by_zone[zone_name]:
+            for st_kod, tuketim_str in sayimlar_by_zone[zone_name]:
                 if yy < min_y:
                     break
                 c.drawString(x, yy, (st_kod or "—")[:20])
-                # Sayıyı sütun içinde sağa yakın çiz
-                c.drawRightString(x + col_w - 1 * mm, yy, str(sayim))
+                # Tüketim var/yok sütun içinde sağa yakın çiz
+                c.drawRightString(x + col_w - 1 * mm, yy, tuketim_str)
                 yy -= ISTASYON_ROW_H
         y -= block_height + 2 * mm
     return y - SECTION_GAP
@@ -182,13 +182,16 @@ def _draw_istasyon_3_columns(c, y, sayimlar_by_zone, min_y=MARGIN):
 def generate_faaliyet_raporu_pdf(work_record):
     """
     Tek bir WorkRecord için Faaliyet Raporu PDF'i üretir.
+    Müşteri ve tesis bilgisi iş kaydından; yoksa kapatılan talepten alınır.
     """
     wr = work_record
     talep = getattr(wr, "kapatilan_talep", None)
-    customer = None
-    facility = None
-    if talep:
+    # Önce iş kaydındaki müşteri/tesis, yoksa talepten
+    customer = getattr(wr, "customer", None)
+    facility = getattr(wr, "facility", None)
+    if not customer and talep:
         customer = getattr(talep, "customer", None)
+    if not facility and talep:
         facility = getattr(talep, "facility", None)
     ekip = getattr(wr, "ekip", None)
 
@@ -326,7 +329,8 @@ def generate_faaliyet_raporu_pdf(work_record):
         st_kod = (getattr(st, "kod", None) or getattr(st, "benzersiz_kod", "")) if st else "—"
         if zone_name not in sayimlar_by_zone:
             sayimlar_by_zone[zone_name] = []
-        sayimlar_by_zone[zone_name].append((st_kod, getattr(sc, "sayim_degeri", 0)))
+        tuketim = getattr(sc, "tuketim_var", False)
+        sayimlar_by_zone[zone_name].append((st_kod, "Var" if tuketim else "Yok"))
     y = _draw_istasyon_3_columns(c, y, sayimlar_by_zone)
 
     c.save()

@@ -9,6 +9,7 @@ from core.views import (
     home,
     login_view,
     logout_view,
+    service_worker,
     customer_list,
     customer_create,
     customer_edit,
@@ -43,6 +44,7 @@ def _admin_extra_urls():
 admin.site.extra_urls = _admin_extra_urls
 
 urlpatterns = [
+    path("service-worker.js", service_worker, name="service_worker"),
     path("", home, name="home"),
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),

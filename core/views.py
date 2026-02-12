@@ -1,6 +1,8 @@
+from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib import messages
 from django.db.models import Q, Count
+from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
@@ -23,6 +25,17 @@ def login_view(request):
         next_url = request.GET.get("next") or "home"
         return redirect(next_url)
     return render(request, "core/login.html", {"form": form})
+
+
+def service_worker(request):
+    """PWA service worker dosyasını sunar (root scope için)."""
+    path = settings.BASE_DIR / "statics" / "service-worker.js"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except OSError:
+        return HttpResponse("", status=404)
+    return HttpResponse(content, content_type="application/javascript")
 
 
 @require_http_methods(["POST"])

@@ -1,0 +1,36 @@
+{% extends 'unfold/layouts/skeleton.html' %}
+
+{% load i18n static unfold %}
+
+{% block extrahead %}
+{{ block.super }}
+{% include "pwa_head.html" %}
+<script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('{% url "service_worker" %}');
+    }
+</script>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }}bg-base-50 login dark:bg-base-900{% endblock %}
+
+{% block usertools %}{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block nav-sidebar %}{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block title %}
+{{ title }} | {{ site_title }}
+{% endblock %}
+
+{% block base %}
+{% block content %}{% endblock %}
+
+{% include "unfold/helpers/unauthenticated_header.html" %}
+
+{% if login_image %}
+{% endif %}
+{% endblock %}

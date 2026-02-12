@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Kale İlaçlama{% endblock %}</title>
     {% block meta %}{% endblock %}
+    {% include "pwa_head.html" %}
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotdJ08HHNDC2VMG3Gt3gGjOA/vuRk5cT+W2+3VJ5k8n+L7nWP2rDP2jVz" crossorigin="anonymous"></script>
     <link href="https://unpkg.com/tabulator-tables@6.3.1/dist/css/tabulator.min.css" rel="stylesheet">
@@ -83,8 +84,8 @@
             </nav>
         </aside>
 
-        {# Content alanı #}
-        <main class="flex-1 overflow-auto p-6">
+        {# Content alanı - min-w-0 ve min-h-0 flex item taşmasını önler #}
+        <main class="flex-1 min-w-0 min-h-0 overflow-auto p-6 relative z-10">
             {% if messages %}
                 <ul class="mb-4 space-y-2">
                     {% for message in messages %}
@@ -142,5 +143,10 @@
         })();
     </script>
     {% block extra_js %}{% endblock %}
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('{% url "service_worker" %}');
+        }
+    </script>
 </body>
 </html>

@@ -4,13 +4,18 @@
 {% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto">
+<div class="max-w-4xl mx-auto">
     {% include "unfold/helpers/messages.html" %}
 
     <div class="mb-6 flex flex-wrap items-center gap-4">
         <a href="{% url 'admin:core_workrecord_change' work_record.pk %}" class="text-primary-600 hover:underline">
             ← İş kaydına dön
         </a>
+        {% if istasyon_sayim_toplu_url %}
+        <a href="{{ istasyon_sayim_toplu_url }}" class="text-primary-600 hover:underline">
+            Toplu liste →
+        </a>
+        {% endif %}
         <h1 class="text-xl font-semibold">{{ title }}</h1>
     </div>
 
@@ -42,159 +47,133 @@
     {% endif %}
     </div>
 
-
-    <div class="grid gap-6 md:grid-cols-2">
-        <section class="p-4 rounded-lg border border-base-200 dark:border-base-700 bg-base-50 dark:bg-base-800 md:min-h-0">
-            <h2 class="text-lg font-semibold mb-4">İstasyon sayım girişi</h2>
-            <p class="text-sm text-base-font-muted-light dark:text-base-font-muted-dark mb-3">
-                QR okutun veya benzersiz kodu yazın, ardından sayım değerini girin.
-            </p>
-            {% if not locked %}
-            <div id="tek-giris-form" class="space-y-4 tek-giris-buyuk">
-                <div class="w-full max-w-full">
-                    <label for="benzersiz_kod" class="block text-base font-medium mb-2">İstasyon Kodu</label>
-                    <div class="w-full">
-                        <input type="text" id="benzersiz_kod" placeholder="MÜŞTERİ-TESİS-BÖLGE-İSTASYON"
-                            class="w-full box-border text-xl px-5 py-4 rounded-xl border border-base-300 dark:border-base-600 bg-white dark:bg-base-900 dark:text-base-font-default-dark focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            autocomplete="off">
-                        <div class="flex gap-2 mt-2 w-full">
-                            <button type="button" id="qr-oku-btn" title="QR kod oku"
-                                class="flex-1 min-w-0 py-3 rounded-xl bg-base-200 dark:bg-base-600 text-base-font-default-light dark:text-base-font-default-dark hover:bg-base-300 dark:hover:bg-base-500 font-medium focus:outline-none focus:ring-2 focus:ring-primary-400">
-                                QR oku
-                            </button>
-                            <button type="button" id="lookup-btn"
-                                class="flex-1 min-w-0 py-3 rounded-xl bg-primary-600 text-white hover:bg-primary-700 font-semibold focus:outline-none focus:ring-2 focus:ring-primary-400">
-                                Bul
-                            </button>
-                        </div>
+    <section class="p-4 rounded-lg border border-base-200 dark:border-base-700 bg-base-50 dark:bg-base-800 mb-6">
+        <h2 class="text-lg font-semibold mb-4">İstasyon sayım girişi</h2>
+        <p class="text-sm text-base-font-muted-light dark:text-base-font-muted-dark mb-3">
+            QR okutun veya benzersiz kodu yazın, ardından tüketim durumunu işaretleyin.
+        </p>
+        {% if not locked %}
+        <div id="tek-giris-form" class="space-y-4 tek-giris-buyuk">
+            <div class="w-full max-w-full">
+                <label for="benzersiz_kod" class="block text-base font-medium mb-2">İstasyon Kodu</label>
+                <div class="w-full">
+                    <input type="text" id="benzersiz_kod" placeholder="MÜŞTERİ-TESİS-BÖLGE-İSTASYON"
+                        class="w-full box-border text-xl px-5 py-4 rounded-xl border border-base-300 dark:border-base-600 bg-white dark:bg-base-900 dark:text-base-font-default-dark focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        autocomplete="off">
+                    <div class="flex gap-3 mt-3 w-full">
+                        <button type="button" id="qr-oku-btn" title="QR kod oku"
+                            class="flex-1 min-w-0 py-5 rounded-xl bg-base-200 dark:bg-base-600 text-base-font-default-light dark:text-base-font-default-dark hover:bg-base-300 dark:hover:bg-base-500 font-bold text-lg focus:outline-none focus:ring-2 focus:ring-primary-400 shadow-md">
+                            QR okut
+                        </button>
+                        <button type="button" id="lookup-btn"
+                            class="flex-1 min-w-0 py-5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 font-bold text-lg focus:outline-none focus:ring-2 focus:ring-primary-400 shadow-md">
+                            BUL
+                        </button>
                     </div>
                 </div>
-                <div id="station-info" class="hidden p-4 rounded-xl bg-base-200 dark:bg-base-700 text-xl"></div>
-                <form method="post" action="{{ istasyon_sayim_url }}" id="sayim-save-form" class="hidden space-y-4">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="save">
-                    <input type="hidden" name="station_id" id="station_id" value="">
-                    <div>
-                        <label for="sayim_degeri" class="block text-base font-medium mb-2">Sayım değeri</label>
-                        <input type="number" id="sayim_degeri" name="sayim_degeri" value="0"
-                            class="tek-giris-input text-xl px-5 py-4 border rounded-xl w-full md:w-48 dark:bg-base-900 dark:border-base-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            step="1" inputmode="numeric" min="0">
-                    </div>
-                    <div>
-                        <label for="not_alani" class="block text-base font-medium mb-2">Not (isteğe bağlı)</label>
-                        <input type="text" id="not_alani" name="not_alani" maxlength="200"
-                            class="tek-giris-input w-full text-xl max-w-full px-5 py-4 border rounded-xl dark:bg-base-900 dark:border-base-600 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                    </div>
-                    <button type="submit"
-                        class="w-full md:w-auto px-6 py-4 rounded-xl bg-primary-600 text-white hover:bg-primary-700 text-lg font-semibold transition-colors">
-                        Kaydet
-                    </button>
-                </form>
             </div>
-            {% else %}
-            <p class="text-base-font-muted-light dark:text-base-font-muted-dark">Sayım kilitli.</p>
-            {% endif %}
-        </section>
-
-        <section class="p-4 rounded-lg border border-base-200 dark:border-base-700 bg-base-50 dark:bg-base-800 flex flex-col md:min-h-0">
-            <h2 class="text-lg font-semibold mb-4 flex-shrink-0">Toplu liste</h2>
-            <form method="get" action="{{ istasyon_sayim_url }}" class="flex flex-wrap gap-3 items-end flex-shrink-0 mb-4">
-                <div>
-                    <label for="facility" class="block text-sm font-medium mb-1">Tesis</label>
-                    <select name="facility" id="facility" class="px-3 py-2 border rounded-md dark:bg-base-900 dark:border-base-600 min-w-[200px]">
-                        <option value="">— Seçin —</option>
-                        {% for f in facilities %}
-                        <option value="{{ f.pk }}" {% if selected_facility and f.pk == selected_facility.pk %}selected{% endif %}>
-                            {{ f.customer.kod }}-{{ f.kod }} {{ f.ad }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% if selected_facility and zones %}
-                <div>
-                    <label for="zone" class="block text-sm font-medium mb-1">Bölge</label>
-                    <select name="zone" id="zone" class="px-3 py-2 border rounded-md dark:bg-base-900 dark:border-base-600 min-w-[150px]">
-                        <option value="">Tümü</option>
-                        {% for z in zones %}
-                        <option value="{{ z.pk }}" {% if selected_zone_id == z.pk|stringformat:"d" %}selected{% endif %}>{{ z.kod }} {{ z.ad }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-                <button type="submit" class="px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 text-sm">Listele</button>
-            </form>
-
-            <div class="flex-1 min-h-0 flex flex-col">
-            {% if not selected_facility %}
-            <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm">Tesis seçip "Listele" ile istasyonları görüntüleyin.</p>
-            {% elif bulk_stations %}
-            {% if not locked %}
-            <form method="post" action="{{ istasyon_sayim_url }}" class="flex flex-col flex-1 min-h-0">
+            <div id="station-info" class="hidden p-4 rounded-xl bg-base-200 dark:bg-base-700 text-xl mb-4"></div>
+            <form method="post" action="{{ istasyon_sayim_url }}{% if selected_facility %}?facility={{ selected_facility.pk }}{% if selected_zone_id %}&zone={{ selected_zone_id }}{% endif %}{% endif %}" id="sayim-save-form" class="hidden space-y-4">
                 {% csrf_token %}
-                <div class="overflow-auto flex-1 min-h-0">
+                <input type="hidden" name="action" value="save">
+                <input type="hidden" name="station_id" id="station_id" value="">
+                <div>
+                    <label for="not_alani" class="block text-base font-medium mb-2">Not (isteğe bağlı)</label>
+                    <input type="text" id="not_alani" name="not_alani" maxlength="200"
+                        class="w-full text-xl px-5 py-4 border rounded-xl dark:bg-base-900 dark:border-base-600 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div class="flex gap-4 mt-6">
+                    <button type="submit" name="tuketim_var" value="1"
+                        class="flex-1 py-8 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors">
+                        Tüketim var
+                    </button>
+                    <button type="submit" name="tuketim_var" value="0"
+                        class="flex-1 py-8 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-2xl shadow-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors">
+                        Tüketim yok
+                    </button>
+                </div>
+            </form>
+        </div>
+        {% else %}
+        <p class="text-base-font-muted-light dark:text-base-font-muted-dark">Sayım kilitli.</p>
+        {% endif %}
+    </section>
+
+    {% if selected_facility %}
+    <div class="space-y-4">
+        <details class="rounded-lg border border-base-200 dark:border-base-700 bg-base-50 dark:bg-base-800 overflow-hidden" {% if bakilmis_stations %}open{% endif %}>
+            <summary class="px-4 py-3 cursor-pointer font-semibold text-base-font-default-light dark:text-base-font-default-dark hover:bg-base-300 dark:hover:bg-base-700">
+                Bakılmış istasyonlar ({{ bakilmis_stations|length }})
+            </summary>
+            <div class="border-t border-base-200 dark:border-base-700">
+                {% if bakilmis_stations %}
+                <div class="overflow-auto max-h-48">
                 <table class="w-full text-sm border-collapse">
                     <thead>
-                        <tr class="border-b border-base-200 dark:border-base-600">
+                        <tr class="border-b border-base-200 dark:border-base-600 bg-base-200 dark:bg-base-700">
                             <th class="text-left py-2 px-2">İstasyon</th>
                             <th class="text-left py-2 px-2">Bölge</th>
-                            <th class="text-left py-2 px-2 w-28">Sayım</th>
-                            <th class="text-left py-2 px-2">Not</th>
+                            <th class="text-left py-2 px-2 w-20">Tüketim</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for row in bulk_stations %}
-                        <tr class="border-b border-base-100 dark:border-base-700 {% if row.count_obj %}bg-green-50 dark:bg-green-900/20{% endif %}">
+                        {% for row in bakilmis_stations %}
+                        <tr class="border-b border-base-100 dark:border-base-700 bg-green-50 dark:bg-green-900/20">
                             <td class="py-2 px-2">{{ row.station.benzersiz_kod }} — {{ row.station.ad }}</td>
                             <td class="py-2 px-2">{{ row.station.zone.kod }}</td>
-                            <td class="py-2 px-2">
-                                <input type="number" name="station_{{ row.station.pk }}" value="{% if row.count_obj %}{{ row.count_obj.sayim_degeri }}{% else %}0{% endif %}" step="1" inputmode="numeric" min="0" class="w-28 px-2 py-1.5 border rounded dark:bg-base-900 dark:border-base-600">
-                            </td>
-                            <td class="py-2 px-2">
-                                <input type="text" name="not_{{ row.station.pk }}" value="{% if row.count_obj %}{{ row.count_obj.not_alani }}{% endif %}" class="w-full max-w-xs px-2 py-1 border rounded dark:bg-base-900 dark:border-base-600" placeholder="Not">
-                            </td>
+                            <td class="py-2 px-2">{% if row.count_obj.tuketim_var %}Var{% else %}Yok{% endif %}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
                 </div>
-                <input type="hidden" name="action" value="save_bulk">
-                <button type="submit" class="mt-4 px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 flex-shrink-0">Toplu kaydet</button>
-            </form>
-            {% else %}
-            <div class="overflow-auto flex-1 min-h-0">
-            <table class="w-full text-sm border-collapse">
-                <thead>
-                    <tr class="border-b border-base-200 dark:border-base-600">
-                        <th class="text-left py-2 px-2">İstasyon</th>
-                        <th class="text-left py-2 px-2">Bölge</th>
-                        <th class="text-left py-2 px-2">Sayım</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in bulk_stations %}
-                    <tr class="border-b border-base-100 dark:border-base-700 {% if row.count_obj %}bg-green-50 dark:bg-green-900/20{% endif %}">
-                        <td class="py-2 px-2">{{ row.station.benzersiz_kod }} — {{ row.station.ad }}</td>
-                        <td class="py-2 px-2">{{ row.station.zone.kod }}</td>
-                        <td class="py-2 px-2">{% if row.count_obj %}{{ row.count_obj.sayim_degeri }}{% else %}—{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                {% else %}
+                <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm p-4">Henüz bakılmış istasyon yok.</p>
+                {% endif %}
             </div>
-            {% endif %}
-            {% else %}
-            <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm">Bu tesis/bölgede istasyon yok.</p>
-            {% endif %}
+        </details>
+
+        <details class="rounded-lg border border-base-200 dark:border-base-700 bg-base-50 dark:bg-base-800 overflow-hidden" {% if bakilmamis_stations and not bakilmis_stations %}open{% endif %}>
+            <summary class="px-4 py-3 cursor-pointer font-semibold text-base-font-default-light dark:text-base-font-default-dark hover:bg-base-300 dark:hover:bg-base-700">
+                Bakılmamış istasyonlar ({{ bakilmamis_stations|length }})
+            </summary>
+            <div class="border-t border-base-200 dark:border-base-700">
+                {% if bakilmamis_stations %}
+                <div class="overflow-auto max-h-48">
+                <table class="w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="border-b border-base-200 dark:border-base-600 bg-base-200 dark:bg-base-700">
+                            <th class="text-left py-2 px-2">İstasyon</th>
+                            <th class="text-left py-2 px-2">Bölge</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in bakilmamis_stations %}
+                        <tr class="border-b border-base-100 dark:border-base-700 text-base-font-muted-light dark:text-base-font-muted-dark">
+                            <td class="py-2 px-2">{{ row.station.benzersiz_kod }} — {{ row.station.ad }}</td>
+                            <td class="py-2 px-2">{{ row.station.zone.kod }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                <p class="text-xs text-base-font-muted-light dark:text-base-font-muted-dark p-2 border-t border-base-200 dark:border-base-700">Bu istasyonlar tek tek sayım ile veya toplu liste sayfasından işlenebilir.</p>
+                {% else %}
+                <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm p-4">Tüm istasyonlar bakıldı.</p>
+                {% endif %}
             </div>
-        </section>
+        </details>
     </div>
+    {% else %}
+    <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm">İş kaydında tesis bilgisi yok. Listeleri görmek için iş kaydında tesis seçin veya toplu liste sayfasını kullanın.</p>
+    {% endif %}
 </div>
 
 <div id="qr-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 hidden">
-    <div class="bg-white dark:bg-base-800 rounded-xl shadow-xl max-w-md w-full p-4">
-        <div class="flex justify-between items-center mb-3">
+    <div class="bg-white dark:bg-base-800 rounded-xl shadow-xl max-w-md w-full p-4 relative">
+        <button type="button" id="qr-modal-kapat" class="absolute top-2 right-2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-base-200 dark:bg-base-600 hover:bg-base-300 dark:hover:bg-base-500 text-2xl font-bold leading-none cursor-pointer" title="Kapat" aria-label="Kapat">×</button>
+        <div class="mb-3 pr-8">
             <h3 class="text-lg font-semibold">QR kod okut</h3>
-            <button type="button" id="qr-modal-kapat" class="px-3 py-1 rounded-lg bg-base-200 dark:bg-base-600 hover:bg-base-300 dark:hover:bg-base-500">Kapat</button>
         </div>
         <div id="qr-reader" class="rounded-lg overflow-hidden"></div>
         <p class="text-sm text-base-font-muted-light dark:text-base-font-muted-dark mt-2">QR kodu kameraya tutun. Okutulunca otomatik devam eder.</p>
@@ -211,7 +190,6 @@
     var stationInfo = document.getElementById('station-info');
     var sayimForm = document.getElementById('sayim-save-form');
     var stationIdInput = document.getElementById('station_id');
-    var sayimInput = document.getElementById('sayim_degeri');
     var qrModal = document.getElementById('qr-modal');
     var qrOkuBtn = document.getElementById('qr-oku-btn');
     var qrModalKapat = document.getElementById('qr-modal-kapat');
@@ -230,7 +208,6 @@
                     stationInfo.classList.remove('hidden');
                     if (stationIdInput) stationIdInput.value = data.id;
                     if (sayimForm) sayimForm.classList.remove('hidden');
-                    if (sayimInput) sayimInput.focus();
                 } else {
                     stationInfo.innerHTML = 'İstasyon bulunamadı.';
                     stationInfo.classList.remove('hidden');

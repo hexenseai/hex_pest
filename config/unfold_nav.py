@@ -16,6 +16,7 @@ CORE_NAV_GROUPS = {
         "core.workrecord",
         "core.talep",
         "core.workrecordstationcount",
+        "core.bagimsiztespit",
     ],
     "Sistem": [
         "core.ekip",
@@ -37,6 +38,7 @@ CORE_NAV_ICONS = {
     "core.workrecord": "assignment",
     "core.talep": "support_agent",
     "core.workrecordstationcount": "qr_code_scanner",
+    "core.bagimsiztespit": "find_in_page",
     "core.ekip": "groups",
     "core.taleptipi": "label",
     "core.uygulamatanim": "science",

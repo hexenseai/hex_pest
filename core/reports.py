@@ -14,6 +14,8 @@ def ilac_kullanımlari_raporu(request):
     qs = (
         WorkRecordIlac.objects.select_related(
             "work_record",
+            "work_record__customer",
+            "work_record__facility",
             "work_record__personel",
             "work_record__ekip",
             "work_record__kapatilan_talep",
@@ -28,6 +30,8 @@ def ilac_kullanımlari_raporu(request):
     for wri in qs:
         wr = wri.work_record
         talep = getattr(wr, "kapatilan_talep", None)
+        customer = wr.customer or (talep.customer if talep else None)
+        facility = wr.facility or (talep.facility if talep else None)
         rows.append({
             "ilac_ticari_ismi": wri.ilac_tanim.ticari_ismi,
             "ilac_firma": wri.ilac_tanim.temin_edildigi_firma,
@@ -38,8 +42,8 @@ def ilac_kullanımlari_raporu(request):
             "is_kaydi_ekip": str(wr.ekip) if wr.ekip_id else "",
             "is_kaydi_form_no": wr.form_numarasi or "",
             "talep": str(talep) if talep else "—",
-            "talep_musteri": talep.customer.kod if talep and talep.customer_id else "—",
-            "talep_tesis": str(talep.facility) if talep and talep.facility_id else "—",
+            "talep_musteri": customer.kod if customer else "—",
+            "talep_tesis": str(facility) if facility else "—",
             "talep_tip": str(talep.tip) if talep and talep.tip_id else "—",
         })
     context = {
@@ -60,6 +64,14 @@ def istasyon_raporu(request):
         end = form.cleaned_data["bitis_tarihi"]
         if request.POST.get("ekran"):
             data = get_istasyon_raporu_data(facility_id, start, end)
+            ratio_genel = data.get("ratio_genel", [])
+            ratio_by_zone = data.get("ratio_by_zone", {})
+            # Oranları % formatında (örn. "50.0%")
+            ratio_genel_fmt = [f"{r * 100:.1f}%" if r is not None else "—" for r in ratio_genel]
+            ratio_by_zone_fmt = {
+                z: [f"{r * 100:.1f}%" if r is not None else "—" for r in ratios]
+                for z, ratios in ratio_by_zone.items()
+            }
             context = {
                 **admin.site.each_context(request),
                 "title": "İstasyon Raporu",
@@ -68,6 +80,9 @@ def istasyon_raporu(request):
                 "rapor_adres": data["adres"],
                 "rapor_date_headers": data["date_headers"],
                 "rapor_rows": data["rows"],
+                "rapor_ratio_genel": ratio_genel_fmt,
+                "rapor_ratio_by_zone": sorted(ratio_by_zone_fmt.items()),
+                "rapor_zone_stats": data.get("zone_stats", []),
             }
             return render(request, "admin/core/rapor_istasyon.html", context)
         excel_bytes = build_istasyon_raporu_excel(facility_id, start, end)

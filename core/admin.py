@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as AuthUserAdmin
@@ -7,12 +8,14 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from unfold.admin import ModelAdmin, TabularInline
 
 from .forms import StationForm, ZoneForm, TalepAdminForm
 from django.core.files.base import ContentFile
 
 from .models import (
+    BagimsizTespit,
     Customer,
     Facility,
     Zone,
@@ -35,6 +38,7 @@ from .models import (
     FaaliyetRaporu,
 )
 from .faaliyet_raporu_pdf import generate_faaliyet_raporu_pdf
+from .bagimsiz_tespit_raporu_pdf import generate_bagimsiz_tespit_raporu_pdf
 from .label_pdf import generate_station_labels_pdf
 from .widgets import ImageCropInput
 from addressbook.models import Contact
@@ -86,7 +90,7 @@ class StationInline(TabularInline):
 class WorkRecordStationCountInline(TabularInline):
     model = WorkRecordStationCount
     extra = 0
-    fields = ("station", "sayim_degeri", "not_alani")
+    fields = ("station", "tuketim_var", "not_alani")
     autocomplete_fields = ["station"]
 
 
@@ -355,20 +359,25 @@ class TespitTanimAdmin(ModelAdmin):
 
 @admin.register(WorkRecord)
 class WorkRecordAdmin(ModelAdmin):
+    formfield_overrides = {
+        models.TimeField: {
+            "widget": forms.TimeInput(attrs={"type": "time", "class": "vTimeField"}),
+        },
+    }
     list_display = (
-        "form_numarasi", "tarih", "personel", "ekip", "baslama_saati", "bitis_saati",
-        "gozlem_ziyareti_yapilmali", "sozlesme_disi_islem_var",
+        "form_numarasi", "tarih", "durum", "customer", "facility", "personel", "ekip",
+        "baslama_saati", "bitis_saati", "baslat_bitir_links",
         "faaliyet_raporu_durum", "kapatilan_talep_link", "istasyon_sayim_link", "created_at",
     )
-    actions = ["faaliyet_raporu_olustur"]
+    actions = ["faaliyet_raporu_olustur", "baslat_action", "bitir_action"]
     list_filter = (
-        "tarih", "personel", "ekip", "gozlem_ziyareti_yapilmali", "sozlesme_disi_islem_var",
+        "tarih", "durum", "customer", "personel", "ekip", "gozlem_ziyareti_yapilmali", "sozlesme_disi_islem_var",
         "skb", "atomizor", "pulverizator", "termal_sis", "ar_uz_ulv", "elk_ulv", "civi_tabancasi",
         "created_at",
     )
-    search_fields = ("personel__username", "oneriler", "form_numarasi")
+    search_fields = ("personel__username", "oneriler", "form_numarasi", "customer__kod", "facility__kod")
     readonly_fields = ("form_numarasi",)
-    autocomplete_fields = ["personel", "ekip", "kapatilan_talep"]
+    autocomplete_fields = ["customer", "facility", "personel", "ekip", "kapatilan_talep"]
     inlines = [
         WorkRecordUygulamaInline,
         WorkRecordTespitInline,
@@ -380,7 +389,8 @@ class WorkRecordAdmin(ModelAdmin):
     fieldsets = (
         (None, {
             "fields": (
-                "tarih", "personel", "ekip", "baslama_saati", "bitis_saati",
+                "tarih", "durum", "customer", "facility", "personel", "ekip",
+                "baslama_saati", "bitis_saati",
                 "gozlem_ziyareti_yapilmali", "sozlesme_disi_islem_var",
                 "oneriler", "not_alani", "kapatilan_talep", "form_numarasi",
             ),
@@ -398,6 +408,16 @@ class WorkRecordAdmin(ModelAdmin):
                 kwargs["queryset"] = IlacTanim.objects.filter(Q(aktif=True) | Q(pk__in=used_ids)).distinct()
             else:
                 kwargs["queryset"] = IlacTanim.objects.filter(aktif=True)
+            return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if db_field.name == "facility":
+            object_id = getattr(request.resolver_match, "kwargs", {}).get("object_id")
+            if object_id:
+                try:
+                    obj = self.get_object(request, object_id)
+                    if obj and obj.customer_id:
+                        kwargs["queryset"] = Facility.objects.filter(customer_id=obj.customer_id).order_by("kod")
+                except Exception:
+                    pass
             return super().formfield_for_foreignkey(db_field, request, **kwargs)
         if db_field.name == "kapatilan_talep":
             qs = kwargs.get("queryset") or Talep.objects.all()
@@ -423,9 +443,11 @@ class WorkRecordAdmin(ModelAdmin):
         try:
             obj = WorkRecord.objects.get(pk=object_id)
             extra_context["istasyon_sayim_url"] = reverse("admin:core_workrecord_istasyon_sayim", args=[obj.pk])
+            extra_context["istasyon_sayim_toplu_url"] = reverse("admin:core_workrecord_istasyon_sayim_toplu", args=[obj.pk])
             extra_context["faaliyet_raporu_pdf_url"] = reverse("admin:core_workrecord_faaliyet_raporu_pdf", args=[obj.pk])
         except WorkRecord.DoesNotExist:
             extra_context["istasyon_sayim_url"] = None
+            extra_context["istasyon_sayim_toplu_url"] = None
             extra_context["faaliyet_raporu_pdf_url"] = None
         return super().change_view(request, object_id, form_url, extra_context)
 
@@ -442,20 +464,53 @@ class WorkRecordAdmin(ModelAdmin):
             return WorkRecordFormWithInitial
         return form_class
 
+    @admin.action(description="Seçilenleri başlat")
+    def baslat_action(self, request, queryset):
+        from django.utils import timezone
+        now = timezone.now().time()
+        count = 0
+        for wr in queryset.filter(durum=WorkRecord.DURUM_BASLANMADI):
+            wr.durum = WorkRecord.DURUM_DEVAM_EDIYOR
+            if not wr.baslama_saati:
+                wr.baslama_saati = now
+            wr.save(update_fields=["durum", "baslama_saati"])
+            count += 1
+        if count:
+            self.message_user(request, f"{count} iş kaydı başlatıldı.", level=messages.SUCCESS)
+        else:
+            self.message_user(request, "Başlatılacak kayıt yok (zaten devam eden veya tamamlanmış).", level=messages.WARNING)
+
+    @admin.action(description="Seçilenleri tamamla")
+    def bitir_action(self, request, queryset):
+        from django.utils import timezone
+        now = timezone.now().time()
+        count = 0
+        for wr in queryset.filter(durum=WorkRecord.DURUM_DEVAM_EDIYOR):
+            wr.durum = WorkRecord.DURUM_TAMAMLANDI
+            if not wr.bitis_saati:
+                wr.bitis_saati = now
+            wr.save(update_fields=["durum", "bitis_saati"])
+            count += 1
+        if count:
+            self.message_user(request, f"{count} iş kaydı tamamlandı.", level=messages.SUCCESS)
+        else:
+            self.message_user(request, "Tamamlanacak kayıt yok (başlanmamış veya zaten tamamlanmış).", level=messages.WARNING)
+
     @admin.action(description="Seçilen iş kayıtları için faaliyet raporu oluştur")
     def faaliyet_raporu_olustur(self, request, queryset):
         from .faaliyet_raporu_pdf import generate_faaliyet_raporu_pdf
 
         olusturulan = 0
         for wr in queryset.select_related(
-            "ekip", "ekip__ekip_lideri", "kapatilan_talep", "kapatilan_talep__customer",
+            "customer", "facility", "ekip", "ekip__ekip_lideri",
+            "kapatilan_talep", "kapatilan_talep__customer",
             "kapatilan_talep__facility", "kapatilan_talep__tip",
         ):
             try:
                 pdf_bytes = generate_faaliyet_raporu_pdf(wr)
-                musteri_kod = ""
-                if wr.kapatilan_talep_id and wr.kapatilan_talep.customer_id:
-                    musteri_kod = wr.kapatilan_talep.customer.kod
+                musteri_kod = (wr.customer.kod if wr.customer_id else "") or (
+                    wr.kapatilan_talep.customer.kod if wr.kapatilan_talep_id and wr.kapatilan_talep.customer_id else ""
+                )
                 is_kaydi_kod = wr.form_numarasi or f"WR-{wr.pk}"
                 rapor, created = FaaliyetRaporu.objects.get_or_create(
                     work_record=wr,
@@ -518,9 +573,24 @@ class WorkRecordAdmin(ModelAdmin):
         urls = super().get_urls()
         custom = [
             path(
+                "<path:object_id>/baslat/",
+                self.admin_site.admin_view(self.baslat_view),
+                name="core_workrecord_baslat",
+            ),
+            path(
+                "<path:object_id>/bitir/",
+                self.admin_site.admin_view(self.bitir_view),
+                name="core_workrecord_bitir",
+            ),
+            path(
                 "<path:object_id>/istasyon-sayim/",
                 self.admin_site.admin_view(self.istasyon_sayim_view),
                 name="core_workrecord_istasyon_sayim",
+            ),
+            path(
+                "<path:object_id>/istasyon-sayim-toplu/",
+                self.admin_site.admin_view(self.istasyon_sayim_toplu_view),
+                name="core_workrecord_istasyon_sayim_toplu",
             ),
             path(
                 "<path:object_id>/faaliyet-raporu-pdf/",
@@ -530,12 +600,63 @@ class WorkRecordAdmin(ModelAdmin):
         ]
         return custom + urls
 
+    def _baslat_or_bitir(self, request, object_id, action):
+        """Başlat veya Bitir işlemi."""
+        from django.core.exceptions import PermissionDenied
+        from django.utils import timezone
+
+        work_record = get_object_or_404(WorkRecord, pk=object_id)
+        if not self.has_change_permission(request, work_record):
+            raise PermissionDenied
+        now = timezone.now().time()
+        if action == "baslat":
+            work_record.durum = WorkRecord.DURUM_DEVAM_EDIYOR
+            if not work_record.baslama_saati:
+                work_record.baslama_saati = now
+        else:  # bitir
+            work_record.durum = WorkRecord.DURUM_TAMAMLANDI
+            if not work_record.bitis_saati:
+                work_record.bitis_saati = now
+        work_record.save(update_fields=["durum", "baslama_saati", "bitis_saati"])
+        return work_record
+
+    def baslat_view(self, request, object_id):
+        self._baslat_or_bitir(request, object_id, "baslat")
+        messages.success(request, "İş kaydı başlatıldı.")
+        return redirect("admin:core_workrecord_changelist")
+
+    def bitir_view(self, request, object_id):
+        self._baslat_or_bitir(request, object_id, "bitir")
+        messages.success(request, "İş kaydı tamamlandı.")
+        return redirect("admin:core_workrecord_changelist")
+
+    def baslat_bitir_links(self, obj):
+        if obj is None or not obj.pk:
+            return "—"
+        links = []
+        if obj.durum == WorkRecord.DURUM_BASLANMADI:
+            url = reverse("admin:core_workrecord_baslat", args=[obj.pk])
+            links.append(
+                f'<a href="{url}" class="inline-flex items-center px-2 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-700 no-underline">Başlat</a>'
+            )
+        elif obj.durum == WorkRecord.DURUM_DEVAM_EDIYOR:
+            url = reverse("admin:core_workrecord_bitir", args=[obj.pk])
+            links.append(
+                f'<a href="{url}" class="inline-flex items-center px-2 py-1 text-xs rounded bg-amber-600 text-white hover:bg-amber-700 no-underline">Bitir</a>'
+            )
+        else:
+            links.append('<span class="text-green-600">✓</span>')
+        return mark_safe(" ".join(links)) if links else "—"
+
+    baslat_bitir_links.short_description = "İşlem"
+
     def faaliyet_raporu_pdf_view(self, request, object_id):
         from django.core.exceptions import PermissionDenied
 
         work_record = get_object_or_404(
             WorkRecord.objects.select_related(
-                "ekip", "ekip__ekip_lideri", "kapatilan_talep", "kapatilan_talep__customer",
+                "customer", "facility", "ekip", "ekip__ekip_lideri",
+                "kapatilan_talep", "kapatilan_talep__customer",
                 "kapatilan_talep__facility", "kapatilan_talep__tip",
             ),
             pk=object_id,
@@ -543,9 +664,9 @@ class WorkRecordAdmin(ModelAdmin):
         if not self.has_view_permission(request, work_record):
             raise PermissionDenied
         pdf_bytes = generate_faaliyet_raporu_pdf(work_record)
-        musteri_kod = ""
-        if work_record.kapatilan_talep_id and work_record.kapatilan_talep.customer_id:
-            musteri_kod = work_record.kapatilan_talep.customer.kod
+        musteri_kod = (work_record.customer.kod if work_record.customer_id else "") or (
+            work_record.kapatilan_talep.customer.kod if work_record.kapatilan_talep_id and work_record.kapatilan_talep.customer_id else ""
+        )
         is_kaydi_kod = work_record.form_numarasi or f"WR-{work_record.pk}"
         rapor, created = FaaliyetRaporu.objects.get_or_create(
             work_record=work_record,
@@ -569,16 +690,14 @@ class WorkRecordAdmin(ModelAdmin):
     def istasyon_sayim_view(self, request, object_id):
         from django.core.exceptions import PermissionDenied
 
-        work_record = get_object_or_404(WorkRecord, pk=object_id)
+        work_record = get_object_or_404(
+            WorkRecord.objects.select_related("facility", "kapatilan_talep"),
+            pk=object_id,
+        )
         if not self.has_view_permission(request, work_record):
             raise PermissionDenied
         locked = work_record.bitis_saati is not None
-        default_facility = None
-        try:
-            if work_record.kapatilan_talep_id:
-                default_facility = work_record.kapatilan_talep.facility
-        except Exception:
-            pass
+        default_facility = work_record.facility or (work_record.kapatilan_talep.facility if work_record.kapatilan_talep_id else None)
 
         # Lookup by benzersiz_kod (GET API for HTMX/JS)
         benzersiz_kod = request.GET.get("benzersiz_kod", "").strip()
@@ -610,53 +729,28 @@ class WorkRecordAdmin(ModelAdmin):
             action = request.POST.get("action")
             if action == "save":
                 station_id = request.POST.get("station_id")
-                try:
-                    sayim = request.POST.get("sayim_degeri", "0").strip() or "0"
-                    sayim_degeri = max(0, int(float(sayim.replace(",", "."))))
-                except (ValueError, TypeError):
-                    sayim_degeri = 0
+                tuketim_var = request.POST.get("tuketim_var") in ("1", "true", "on", "yes")
                 not_alani = request.POST.get("not_alani", "").strip()
                 if station_id:
                     station = get_object_or_404(Station, pk=station_id)
                     obj, _ = WorkRecordStationCount.objects.get_or_create(
                         work_record=work_record,
                         station=station,
-                        defaults={"sayim_degeri": sayim_degeri, "not_alani": not_alani},
+                        defaults={"tuketim_var": tuketim_var, "not_alani": not_alani},
                     )
                     if not _:
-                        obj.sayim_degeri = sayim_degeri
+                        obj.tuketim_var = tuketim_var
                         obj.not_alani = not_alani
                         obj.save()
-                    messages.success(request, f"Sayım kaydedildi: {station.benzersiz_kod}")
-            elif action == "save_bulk":
-                # POST keys like station_123 = value, not_123 = optional
-                saved = 0
-                for key, value in request.POST.items():
-                    if key.startswith("station_") and key[8:].isdigit():
-                        sid = int(key[8:])
-                        try:
-                            sayim_degeri = max(0, int(float(str(value).strip().replace(",", ".") or "0")))
-                        except (ValueError, TypeError):
-                            sayim_degeri = 0
-                        not_key = f"not_{sid}"
-                        not_alani = request.POST.get(not_key, "").strip()
-                        try:
-                            station = Station.objects.get(pk=sid)
-                            obj, _ = WorkRecordStationCount.objects.get_or_create(
-                                work_record=work_record,
-                                station=station,
-                                defaults={"sayim_degeri": sayim_degeri, "not_alani": not_alani},
-                            )
-                            if not _:
-                                obj.sayim_degeri = sayim_degeri
-                                obj.not_alani = not_alani
-                                obj.save()
-                            saved += 1
-                        except Station.DoesNotExist:
-                            pass
-                if saved:
-                    messages.success(request, f"{saved} sayım güncellendi.")
-            return redirect("admin:core_workrecord_istasyon_sayim", object_id=object_id)
+                    messages.success(request, f"Tüketim kaydedildi: {station.benzersiz_kod}")
+            redirect_url = reverse("admin:core_workrecord_istasyon_sayim", args=[object_id])
+            fid = request.GET.get("facility") or request.POST.get("facility")
+            zid = request.GET.get("zone") or request.POST.get("zone")
+            if fid:
+                redirect_url += f"?facility={fid}"
+                if zid:
+                    redirect_url += f"&zone={zid}"
+            return redirect(redirect_url)
 
         # Selected facility/zone for summary and bulk list
         facility_id = request.GET.get("facility") or (str(default_facility.pk) if default_facility else None)
@@ -687,8 +781,119 @@ class WorkRecordAdmin(ModelAdmin):
                 ).count()
                 summary_zone = {"toplam": total_z, "girilen": entered_z, "kalan": total_z - entered_z}
 
-        # Bulk list: stations in facility (and zone) with current count
+        # Bakılmış ve bakılmamış istasyonlar (sayım sayfasında sadece listeleme)
+        bakilmis_stations = []
+        bakilmamis_stations = []
+        if selected_facility:
+            stations_qs = (
+                Station.objects.filter(zone__facility=selected_facility)
+                .select_related("zone")
+                .order_by("zone__kod", "kod")
+            )
+            if zone_id:
+                stations_qs = stations_qs.filter(zone_id=zone_id)
+            existing = {
+                sc.station_id: sc
+                for sc in WorkRecordStationCount.objects.filter(
+                    work_record=work_record,
+                    station__in=stations_qs,
+                )
+            }
+            for st in stations_qs:
+                row = {"station": st, "count_obj": existing.get(st.pk)}
+                if row["count_obj"]:
+                    bakilmis_stations.append(row)
+                else:
+                    bakilmamis_stations.append(row)
+
+        facilities = Facility.objects.select_related("customer").order_by("customer__kod", "kod")[:500]
+        zones = list(selected_facility.bolgeler.order_by("kod")) if selected_facility else []
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"İstasyon sayımı — {work_record}",
+            "work_record": work_record,
+            "locked": locked,
+            "opts": WorkRecord._meta,
+            "default_facility": default_facility,
+            "selected_facility": selected_facility,
+            "selected_zone_id": zone_id,
+            "summary_facility": summary_facility,
+            "summary_zone": summary_zone,
+            "bakilmis_stations": bakilmis_stations,
+            "bakilmamis_stations": bakilmamis_stations,
+            "facilities": facilities,
+            "zones": zones,
+            "istasyon_sayim_url": reverse("admin:core_workrecord_istasyon_sayim", args=[work_record.pk]),
+            "istasyon_sayim_toplu_url": reverse("admin:core_workrecord_istasyon_sayim_toplu", args=[work_record.pk]),
+        }
+        return render(request, "admin/core/workrecord/istasyon_sayim.html", context)
+
+    def istasyon_sayim_toplu_view(self, request, object_id):
+        """Toplu liste sayfası: tesis/bölge seçip tüm istasyonları düzenlenebilir tabloda gösterir."""
+        from django.core.exceptions import PermissionDenied
+
+        work_record = get_object_or_404(
+            WorkRecord.objects.select_related("facility", "kapatilan_talep"),
+            pk=object_id,
+        )
+        if not self.has_view_permission(request, work_record):
+            raise PermissionDenied
+        locked = work_record.bitis_saati is not None
+        default_facility = work_record.facility or (work_record.kapatilan_talep.facility if work_record.kapatilan_talep_id else None)
+
+        # POST: save_bulk
+        if request.method == "POST" and not locked:
+            if not self.has_change_permission(request, work_record):
+                raise PermissionDenied
+            if request.POST.get("action") == "save_bulk":
+                saved = 0
+                ids_str = request.POST.get("bulk_station_ids", "")
+                for sid_str in ids_str.split(",") if ids_str else []:
+                    try:
+                        sid = int(sid_str.strip())
+                    except (ValueError, TypeError):
+                        continue
+                    tuketim_var = request.POST.get(f"tuketim_{sid}") in ("1", "true", "on", "yes")
+                    not_alani = request.POST.get(f"not_{sid}", "").strip()
+                    try:
+                        station = Station.objects.get(pk=sid)
+                        obj, _ = WorkRecordStationCount.objects.get_or_create(
+                            work_record=work_record,
+                            station=station,
+                            defaults={"tuketim_var": tuketim_var, "not_alani": not_alani},
+                        )
+                        if not _:
+                            obj.tuketim_var = tuketim_var
+                            obj.not_alani = not_alani
+                            obj.save()
+                        saved += 1
+                    except Station.DoesNotExist:
+                        pass
+                if saved:
+                    messages.success(request, f"{saved} tüketim kaydı güncellendi.")
+            redirect_url = reverse("admin:core_workrecord_istasyon_sayim_toplu", args=[object_id])
+            fid = request.GET.get("facility") or request.POST.get("facility")
+            zid = request.GET.get("zone") or request.POST.get("zone")
+            if fid:
+                redirect_url += f"?facility={fid}"
+                if zid:
+                    redirect_url += f"&zone={zid}"
+            return redirect(redirect_url)
+
+        facility_id = request.GET.get("facility") or (str(default_facility.pk) if default_facility else None)
+        zone_id = request.GET.get("zone")
+        selected_facility = None
+        if facility_id:
+            try:
+                selected_facility = Facility.objects.get(pk=facility_id)
+            except Facility.DoesNotExist:
+                pass
+        if not selected_facility and default_facility:
+            selected_facility = default_facility
+
         bulk_stations = []
+        summary_facility = summary_zone = None
         if selected_facility:
             stations_qs = (
                 Station.objects.filter(zone__facility=selected_facility)
@@ -707,12 +912,26 @@ class WorkRecordAdmin(ModelAdmin):
             for st in stations_qs:
                 bulk_stations.append({"station": st, "count_obj": existing.get(st.pk)})
 
+            total_f = Station.objects.filter(zone__facility=selected_facility).count()
+            entered_f = WorkRecordStationCount.objects.filter(
+                work_record=work_record,
+                station__zone__facility=selected_facility,
+            ).count()
+            summary_facility = {"toplam": total_f, "girilen": entered_f, "kalan": total_f - entered_f}
+            if zone_id and selected_facility.bolgeler.filter(pk=zone_id).exists():
+                total_z = Station.objects.filter(zone_id=zone_id).count()
+                entered_z = WorkRecordStationCount.objects.filter(
+                    work_record=work_record,
+                    station__zone_id=zone_id,
+                ).count()
+                summary_zone = {"toplam": total_z, "girilen": entered_z, "kalan": total_z - entered_z}
+
         facilities = Facility.objects.select_related("customer").order_by("customer__kod", "kod")[:500]
         zones = list(selected_facility.bolgeler.order_by("kod")) if selected_facility else []
 
         context = {
             **self.admin_site.each_context(request),
-            "title": f"İstasyon sayımı — {work_record}",
+            "title": f"İstasyon sayımı (toplu liste) — {work_record}",
             "work_record": work_record,
             "locked": locked,
             "opts": WorkRecord._meta,
@@ -724,9 +943,10 @@ class WorkRecordAdmin(ModelAdmin):
             "bulk_stations": bulk_stations,
             "facilities": facilities,
             "zones": zones,
+            "istasyon_sayim_toplu_url": reverse("admin:core_workrecord_istasyon_sayim_toplu", args=[work_record.pk]),
             "istasyon_sayim_url": reverse("admin:core_workrecord_istasyon_sayim", args=[work_record.pk]),
         }
-        return render(request, "admin/core/workrecord/istasyon_sayim.html", context)
+        return render(request, "admin/core/workrecord/istasyon_sayim_toplu.html", context)
 
     def istasyon_sayim_link(self, obj):
         if obj is None or not obj.pk:
@@ -799,7 +1019,7 @@ class TalepAdmin(ModelAdmin):
 
 @admin.register(WorkRecordStationCount)
 class WorkRecordStationCountAdmin(ModelAdmin):
-    list_display = ("work_record", "station", "sayim_degeri", "created_at")
+    list_display = ("work_record", "station", "tuketim_var", "created_at")
     list_filter = ("work_record__tarih", "work_record")
     search_fields = ("station__benzersiz_kod",)
     autocomplete_fields = ["work_record", "station"]
@@ -827,6 +1047,68 @@ class FaaliyetRaporuAdmin(ModelAdmin):
         return format_html('<a href="{}" target="_blank" rel="noopener">PDF indir</a>', url)
 
     pdf_link.short_description = "PDF"
+
+
+@admin.register(BagimsizTespit)
+class BagimsizTespitAdmin(ModelAdmin):
+    list_display = (
+        "tarih",
+        "firma",
+        "tesis",
+        "yer_aciklamasi_short",
+        "raporlandi",
+        "created_at",
+    )
+    list_filter = ("tarih", "firma", "raporlandi", "created_at")
+    search_fields = ("yer_aciklamasi", "gozlem_aciklamasi", "oneriler", "firma__kod", "firma__firma_ismi")
+    autocomplete_fields = ["firma", "tesis"]
+    date_hierarchy = "tarih"
+    actions = ["rapor_olustur"]
+    fieldsets = (
+        (None, {
+            "fields": ("tarih", "firma", "tesis", "raporlandi"),
+        }),
+        ("Açıklamalar", {
+            "fields": ("yer_aciklamasi", "gozlem_aciklamasi", "oneriler"),
+        }),
+        ("Görseller", {
+            "fields": ("gorsel1", "gorsel2", "gorsel3"),
+        }),
+    )
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "tesis":
+            object_id = getattr(request.resolver_match, "kwargs", {}).get("object_id")
+            if object_id:
+                try:
+                    obj = self.get_object(request, object_id)
+                    if obj and obj.firma_id:
+                        kwargs["queryset"] = Facility.objects.filter(customer_id=obj.firma_id).order_by("kod")
+                except Exception:
+                    pass
+            return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def yer_aciklamasi_short(self, obj):
+        if obj.yer_aciklamasi:
+            return (obj.yer_aciklamasi[:60] + "…") if len(obj.yer_aciklamasi) > 60 else obj.yer_aciklamasi
+        return "—"
+
+    yer_aciklamasi_short.short_description = "Yer açıklaması"
+
+    @admin.action(description="Seçili kayıtlardan rapor oluştur (PDF)")
+    def rapor_olustur(self, request, queryset):
+        if not queryset.exists():
+            self.message_user(request, "En az bir kayıt seçin.", level=messages.WARNING)
+            return
+        try:
+            pdf_bytes = generate_bagimsiz_tespit_raporu_pdf(queryset)
+        except Exception as e:
+            self.message_user(request, f"PDF oluşturulamadı: {e}", level=messages.ERROR)
+            return
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = 'attachment; filename="bagimsiz-tespitler-raporu.pdf"'
+        return response
 
 
 # Kullanıcı admin: profil fotoğrafı (avatar) inline + kare kırpma

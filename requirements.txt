@@ -1,4 +1,5 @@
 Django>=5.0
+django-environ
 django-unfold
 openpyxl
 Pillow

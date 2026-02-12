@@ -68,13 +68,30 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {% if rapor_ratio_genel %}
+                    <tr class="border-b border-base-200 dark:border-base-600 bg-base-200 dark:bg-base-700">
+                        <td colspan="3" class="py-1.5 px-3 text-xs font-medium">Tüketim oranı (genel)</td>
+                        {% for r in rapor_ratio_genel %}
+                        <td class="py-1.5 px-2 text-center text-xs">{{ r }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% for zone_name, ratios in rapor_ratio_by_zone %}
+                    <tr class="border-b border-base-200 dark:border-base-600 bg-base-200 dark:bg-base-700">
+                        <td colspan="3" class="py-1.5 px-3 text-xs font-medium">Tüketim oranı - {{ zone_name }}</td>
+                        {% for r in ratios %}
+                        <td class="py-1.5 px-2 text-center text-xs">{{ r }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="border-b border-base-300 dark:border-base-600"><td colspan="100" class="py-1"></td></tr>
+                    {% endif %}
                     {% for row in rapor_rows %}
                     <tr class="border-b border-base-100 dark:border-base-700 hover:bg-base-50 dark:hover:bg-base-800">
                         <td class="py-2 px-3">{{ row.zone }}</td>
                         <td class="py-2 px-3">{{ row.kod }}</td>
                         <td class="py-2 px-3">{{ row.ad }}</td>
                         {% for c in row.counts %}
-                        <td class="py-2 px-2 text-center">{% if c is not None %}{{ c }}{% else %}—{% endif %}</td>
+                        <td class="py-2 px-2 text-center">{% if c %}Var{% elif c is False %}Yok{% else %}—{% endif %}</td>
                         {% endfor %}
                     </tr>
                     {% empty %}
@@ -85,6 +102,35 @@
                 </tbody>
             </table>
         </div>
+        {% if rapor_zone_stats %}
+        <div class="mt-4 rounded-lg border border-base-200 dark:border-base-700 overflow-hidden">
+            <h3 class="text-base font-semibold px-4 py-2 bg-base-100 dark:bg-base-800 border-b border-base-200 dark:border-base-600">Bölge İstatistikleri</h3>
+            <table class="w-full text-sm border-collapse">
+                <thead>
+                    <tr class="bg-base-100 dark:bg-base-800 border-b border-base-200 dark:border-base-600">
+                        <th class="text-left py-2 px-3 font-semibold">Bölge</th>
+                        <th class="text-center py-2 px-2 font-semibold">Tüketim değişim oranı</th>
+                        <th class="text-center py-2 px-2 font-semibold">İstasyon değişimi oranı</th>
+                        <th class="text-center py-2 px-2 font-semibold">Var (ilk)</th>
+                        <th class="text-center py-2 px-2 font-semibold">Var (son)</th>
+                        <th class="text-center py-2 px-2 font-semibold">Toplam istasyon</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in rapor_zone_stats %}
+                    <tr class="border-b border-base-100 dark:border-base-700">
+                        <td class="py-2 px-3">{{ s.zone }}</td>
+                        <td class="py-2 px-2 text-center">{{ s.tuketim_degisim|floatformat:1 }}%</td>
+                        <td class="py-2 px-2 text-center">{{ s.istasyon_degisim|floatformat:1 }}%</td>
+                        <td class="py-2 px-2 text-center">{{ s.var_ilk }}</td>
+                        <td class="py-2 px-2 text-center">{{ s.var_son }}</td>
+                        <td class="py-2 px-2 text-center">{{ s.zone_total }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 </div>

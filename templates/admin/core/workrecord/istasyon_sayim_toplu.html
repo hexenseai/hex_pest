@@ -1,0 +1,141 @@
+{% extends "unfold/layouts/base_simple.html" %}
+{% load i18n unfold %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    {% include "unfold/helpers/messages.html" %}
+
+    <div class="mb-6 flex flex-wrap items-center gap-4">
+        <a href="{% url 'admin:core_workrecord_change' work_record.pk %}" class="text-primary-600 hover:underline">
+            ← İş kaydına dön
+        </a>
+        <a href="{{ istasyon_sayim_url }}" class="text-primary-600 hover:underline">
+            ← Tek tek sayım
+        </a>
+        <h1 class="text-xl font-semibold">{{ title }}</h1>
+    </div>
+
+    {% if locked %}
+    <div class="p-4 mb-6 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+        Bitiş saati girildiği için sayım kilitlendi. Değişiklik yapılamaz.
+    </div>
+    {% endif %}
+
+    <div class="mb-6 p-4 rounded-lg bg-base-100 dark:bg-base-800 border border-base-200 dark:border-base-700">
+        <p class="text-base-font-medium-light dark:text-base-font-medium-dark">
+            {{ work_record.tarih }} — {{ work_record.personel.get_username }}{% if work_record.ekip %} ({{ work_record.ekip }}){% endif %}
+            {% if work_record.baslama_saati %} {{ work_record.baslama_saati }}{% endif %}
+            {% if work_record.bitis_saati %} – {{ work_record.bitis_saati }}{% endif %}
+        </p>
+        {% if summary_facility and selected_facility %}
+        <p class="mb-1">
+            <strong>Tesis ({{ selected_facility }}):</strong>
+            Toplam {{ summary_facility.toplam }} istasyon, {{ summary_facility.girilen }} giriş yapıldı, <strong>{{ summary_facility.kalan }} kalan</strong>
+        </p>
+        {% endif %}
+        {% if summary_zone %}
+        <p>
+            <strong>Bölge:</strong>
+            Toplam {{ summary_zone.toplam }} istasyon, {{ summary_zone.girilen }} giriş yapıldı, <strong>{{ summary_zone.kalan }} kalan</strong>
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="p-4 rounded-lg border border-base-200 dark:border-base-700 bg-base-50 dark:bg-base-800">
+        <h2 class="text-lg font-semibold mb-4">Toplu liste</h2>
+        <form method="get" action="{{ istasyon_sayim_toplu_url }}" class="flex flex-wrap gap-3 items-end mb-4">
+            <div>
+                <label for="facility" class="block text-sm font-medium mb-1">Tesis</label>
+                <select name="facility" id="facility" class="px-3 py-2 border rounded-md dark:bg-base-900 dark:border-base-600 min-w-[200px]">
+                    <option value="">— Seçin —</option>
+                    {% for f in facilities %}
+                    <option value="{{ f.pk }}" {% if selected_facility and f.pk == selected_facility.pk %}selected{% endif %}>
+                        {{ f.customer.kod }}-{{ f.kod }} {{ f.ad }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% if selected_facility and zones %}
+            <div>
+                <label for="zone" class="block text-sm font-medium mb-1">Bölge</label>
+                <select name="zone" id="zone" class="px-3 py-2 border rounded-md dark:bg-base-900 dark:border-base-600 min-w-[150px]">
+                    <option value="">Tümü</option>
+                    {% for z in zones %}
+                    <option value="{{ z.pk }}" {% if selected_zone_id == z.pk|stringformat:"d" %}selected{% endif %}>{{ z.kod }} {{ z.ad }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <button type="submit" class="px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 text-sm">Listele</button>
+        </form>
+
+        {% if not selected_facility %}
+        <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm">Tesis seçip "Listele" ile istasyonları görüntüleyin.</p>
+        {% elif bulk_stations %}
+        {% if not locked %}
+        <form method="post" action="{{ istasyon_sayim_toplu_url }}{% if selected_facility %}?facility={{ selected_facility.pk }}{% if selected_zone_id %}&zone={{ selected_zone_id }}{% endif %}{% endif %}">
+            {% csrf_token %}
+            <div class="overflow-auto max-h-[60vh]">
+            <table class="w-full text-sm border-collapse">
+                <thead>
+                    <tr class="border-b border-base-200 dark:border-base-600">
+                        <th class="text-left py-2 px-2">İstasyon</th>
+                        <th class="text-left py-2 px-2">Bölge</th>
+                        <th class="text-left py-2 px-2 w-28">Tüketim</th>
+                        <th class="text-left py-2 px-2">Not</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in bulk_stations %}
+                    <tr class="border-b border-base-100 dark:border-base-700 {% if row.count_obj %}bg-green-50 dark:bg-green-900/20{% endif %}">
+                        <td class="py-2 px-2">{{ row.station.benzersiz_kod }} — {{ row.station.ad }}</td>
+                        <td class="py-2 px-2">{{ row.station.zone.kod }}</td>
+                        <td class="py-2 px-2">
+                            <label class="inline-flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" name="tuketim_{{ row.station.pk }}" value="1" {% if row.count_obj and row.count_obj.tuketim_var %}checked{% endif %}
+                                    class="w-4 h-4 rounded border-base-300 dark:border-base-600 text-primary-600 focus:ring-primary-500">
+                                <span class="text-sm">Var</span>
+                            </label>
+                        </td>
+                        <td class="py-2 px-2">
+                            <input type="text" name="not_{{ row.station.pk }}" value="{% if row.count_obj %}{{ row.count_obj.not_alani }}{% endif %}" class="w-full max-w-xs px-2 py-1 border rounded dark:bg-base-900 dark:border-base-600" placeholder="Not">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            <input type="hidden" name="action" value="save_bulk">
+            <input type="hidden" name="bulk_station_ids" value="{% for row in bulk_stations %}{{ row.station.pk }}{% if not forloop.last %},{% endif %}{% endfor %}">
+            <button type="submit" class="mt-4 px-4 py-2 rounded-md bg-primary-600 text-white hover:bg-primary-700 flex-shrink-0">Toplu kaydet</button>
+        </form>
+        {% else %}
+        <div class="overflow-auto max-h-[60vh]">
+        <table class="w-full text-sm border-collapse">
+            <thead>
+                <tr class="border-b border-base-200 dark:border-base-600">
+                    <th class="text-left py-2 px-2">İstasyon</th>
+                    <th class="text-left py-2 px-2">Bölge</th>
+                    <th class="text-left py-2 px-2">Tüketim</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in bulk_stations %}
+                <tr class="border-b border-base-100 dark:border-base-700 {% if row.count_obj %}bg-green-50 dark:bg-green-900/20{% endif %}">
+                    <td class="py-2 px-2">{{ row.station.benzersiz_kod }} — {{ row.station.ad }}</td>
+                    <td class="py-2 px-2">{{ row.station.zone.kod }}</td>
+                    <td class="py-2 px-2">{% if row.count_obj and row.count_obj.tuketim_var %}Var{% else %}Yok{% endif %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% endif %}
+        {% else %}
+        <p class="text-base-font-muted-light dark:text-base-font-muted-dark text-sm">Bu tesis/bölgede istasyon yok.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

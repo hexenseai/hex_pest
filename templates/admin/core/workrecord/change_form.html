@@ -3,10 +3,13 @@
 
 {% block object-tools-items %}
     {{ block.super }}
-    {% if faaliyet_raporu_pdf_url %}
-        {% include "unfold/helpers/tab_action.html" with title="Faaliyet raporu (PDF)" link=faaliyet_raporu_pdf_url icon="picture_as_pdf" %}
-    {% endif %}
     {% if istasyon_sayim_url %}
         {% include "unfold/helpers/tab_action.html" with title="İstasyon sayımı" link=istasyon_sayim_url icon="qr_code_scanner" %}
+    {% endif %}
+    {% if istasyon_sayim_toplu_url %}
+        {% include "unfold/helpers/tab_action.html" with title="İstasyon sayımı (toplu liste)" link=istasyon_sayim_toplu_url icon="list" %}
+    {% endif %}
+    {% if faaliyet_raporu_pdf_url %}
+        {% include "unfold/helpers/tab_action.html" with title="Faaliyet raporu (PDF)" link=faaliyet_raporu_pdf_url icon="picture_as_pdf" %}
     {% endif %}
 {% endblock %}
