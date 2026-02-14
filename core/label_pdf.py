@@ -64,7 +64,7 @@ QR_SIZE_MM = 18  # kare QR, etiket yüksekliğine sığacak
 TEXT_LEFT_MM = 23  # metin alanı başlangıcı
 MARGIN_MM = 3  # kenarlardan boşluk
 TEXT_RIGHT_MARGIN_MM = 3  # sağ kenar boşluğu
-FONT_ZONE_STATION = 7   # bölge ve istasyon açıklaması (benzersiz_kod dışı)
+FONT_ZONE_STATION = 10  # bölge ve istasyon açıklaması (benzersiz_kod dışı)
 FONT_BENZERSIZ = 14     # benzersiz kod (kalın)
 LINE_HEIGHT_PT = 10     # satır aralığı
 

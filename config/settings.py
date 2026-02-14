@@ -122,6 +122,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+# Karakter seti — Türkçe karakter desteği
+DEFAULT_CHARSET = "utf-8"
+
 # Internationalization — tamamen Türkçe arayüz
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
