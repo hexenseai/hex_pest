@@ -17,27 +17,46 @@ _FONT_BOLD_NAME = "Helvetica-Bold"
 
 
 def _register_turkish_fonts():
-    """Türkçe karakter destekleyen TTF font kaydeder. Öncelik: core/fonts/DejaVu → Windows Arial."""
+    """Türkçe karakter destekleyen TTF font kaydeder.
+    Öncelik: core/fonts/DejaVu → Linux sistem DejaVu → Windows Arial.
+    Ubuntu/Linux'ta sistem DejaVu fontları kullanılır (fonts-dejavu-core paketi).
+    """
     global _FONT_NAME, _FONT_BOLD_NAME
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
-    core_dir = os.path.dirname(os.path.abspath(__file__))
-    fonts_dir = os.path.join(core_dir, "fonts")
+    def _try_register_dejavu(regular_path, bold_path):
+        if os.path.isfile(regular_path) and os.path.isfile(bold_path):
+            try:
+                pdfmetrics.registerFont(TTFont("DejaVuSans", regular_path))
+                pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", bold_path))
+                return True
+            except Exception:
+                pass
+        return False
 
     # 1) Proje içi core/fonts: DejaVuSans.ttf, DejaVuSans-Bold.ttf
+    core_dir = os.path.dirname(os.path.abspath(__file__))
+    fonts_dir = os.path.join(core_dir, "fonts")
     dejavu_regular = os.path.join(fonts_dir, "DejaVuSans.ttf")
     dejavu_bold = os.path.join(fonts_dir, "DejaVuSans-Bold.ttf")
-    if os.path.isfile(dejavu_regular) and os.path.isfile(dejavu_bold):
-        try:
-            pdfmetrics.registerFont(TTFont("DejaVuSans", dejavu_regular))
-            pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", dejavu_bold))
+    if _try_register_dejavu(dejavu_regular, dejavu_bold):
+        _FONT_NAME, _FONT_BOLD_NAME = "DejaVuSans", "DejaVuSans-Bold"
+        return
+
+    # 2) Linux/Ubuntu: Sistem DejaVu fontları (fonts-dejavu-core paketi)
+    linux_dejavu_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    ]
+    for regular in linux_dejavu_paths:
+        bold = regular.replace("DejaVuSans.ttf", "DejaVuSans-Bold.ttf")
+        if _try_register_dejavu(regular, bold):
             _FONT_NAME, _FONT_BOLD_NAME = "DejaVuSans", "DejaVuSans-Bold"
             return
-        except Exception:
-            pass
 
-    # 2) Windows: Arial (Türkçe destekli)
+    # 3) Windows: Arial (Türkçe destekli)
     windir = os.environ.get("WINDIR", "")
     if windir:
         arial = os.path.join(windir, "Fonts", "arial.ttf")
