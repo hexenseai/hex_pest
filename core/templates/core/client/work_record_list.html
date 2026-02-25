@@ -144,8 +144,6 @@ function showDetailModal(d) {
     html += '<div><span class="text-gray-500">Personel:</span> ' + (d.personel || "—") + '</div>';
     html += '<div><span class="text-gray-500">Ekip:</span> ' + (d.ekip || "—") + '</div>';
     html += '<div><span class="text-gray-500">Durum:</span> ' + (d.durum || "—") + '</div>';
-    html += '<div><span class="text-gray-500">Başlama:</span> ' + (d.baslama_saati || "—") + '</div>';
-    html += '<div><span class="text-gray-500">Bitiş:</span> ' + (d.bitis_saati || "—") + '</div>';
     html += '<div class="col-span-2"><span class="text-gray-500">Bayraklar:</span> ';
     if (d.gozlem_ziyareti_yapilmali) html += '<span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs">Gözlem ziyareti</span> ';
     if (d.sozlesme_disi_islem_var) html += '<span class="px-2 py-0.5 bg-orange-100 text-orange-800 rounded text-xs">Sözleşme dışı</span>';
