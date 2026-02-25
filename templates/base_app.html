@@ -33,9 +33,9 @@
                     <span class="text-sm font-medium text-gray-700">{{ user_profile.customer.firma_ismi }}{% if user_profile.facility %} — {{ user_profile.facility.ad }}{% endif %}</span>
                 {% endif %}
             </div>
-            <div class="flex items-center gap-4">
-                {% if user.is_staff %}
-                <a href="{% url 'admin:index' %}" class="text-sm font-medium text-gray-700 hover:text-gray-900 px-3 py-1.5 rounded-md hover:bg-gray-100">Admin</a>
+            <div class="flex items-center gap-3">
+                {% if show_admin_link or user.is_staff %}
+                <a href="{% url 'admin:index' %}" class="inline-flex items-center gap-1.5 text-sm font-medium text-white bg-gray-700 hover:bg-gray-800 px-3 py-2 rounded-md transition">Yönetim paneline geç</a>
                 {% endif %}
                 <form method="post" action="{% url 'logout' %}" class="inline">
                     {% csrf_token %}

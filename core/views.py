@@ -226,6 +226,7 @@ def home(request):
                 "zone_pie_by_facility": {},
                 "unresolved_bagimsiz_tespit_count": unresolved_count,
                 "last_unresolved_bagimsiz_tespitler": last_unresolved,
+                "show_admin_link": request.user.is_staff,
             },
         )
 
@@ -290,6 +291,7 @@ def home(request):
             "zone_pie_by_facility": zone_pie_by_facility,
             "unresolved_bagimsiz_tespit_count": unresolved_bagimsiz_tespit_count,
             "last_unresolved_bagimsiz_tespitler": last_unresolved_bagimsiz_tespitler,
+            "show_admin_link": request.user.is_staff,
         },
     )
 
@@ -301,7 +303,11 @@ def client_facility_list(request):
     facilities = profile.get_visible_facilities().select_related("customer").prefetch_related(
         "bolgeler__istasyonlar"
     ).order_by("kod")
-    return render(request, "core/client/facility_list.html", {"facilities": facilities})
+    return render(
+        request,
+        "core/client/facility_list.html",
+        {"facilities": facilities, "show_admin_link": request.user.is_staff},
+    )
 
 
 @client_portal_required
@@ -393,6 +399,7 @@ def client_work_record_list(request):
             "facilities": facilities,
             "facility_filter": facility_filter,
             "q": request.GET.get("q", "").strip(),
+            "show_admin_link": request.user.is_staff,
         },
     )
 
@@ -414,7 +421,11 @@ def client_bagimsiz_tespit_list(request):
     return render(
         request,
         "core/client/bagimsiz_tespit_list.html",
-        {"tespitler": tespitler, "facilities": facilities},
+        {
+            "tespitler": tespitler,
+            "facilities": facilities,
+            "show_admin_link": request.user.is_staff,
+        },
     )
 
 
@@ -468,15 +479,27 @@ def client_istasyon_raporu(request):
     facility_ids = set(profile.get_visible_facilities().values_list("pk", flat=True))
     ids_param = request.GET.get("ids", "").strip()
     if not ids_param:
-        return render(request, "core/client/istasyon_raporu.html", {"reports": [], "error": "Lütfen faaliyet kayıtları sayfasından rapor görmek istediğiniz kayıtları seçin."})
+        return render(
+            request,
+            "core/client/istasyon_raporu.html",
+            {"reports": [], "error": "Lütfen faaliyet kayıtları sayfasından rapor görmek istediğiniz kayıtları seçin.", "show_admin_link": request.user.is_staff},
+        )
 
     try:
         work_record_ids = [int(x) for x in ids_param.split(",") if x.strip()]
     except ValueError:
-        return render(request, "core/client/istasyon_raporu.html", {"reports": [], "error": "Geçersiz kayıt seçimi."})
+        return render(
+            request,
+            "core/client/istasyon_raporu.html",
+            {"reports": [], "error": "Geçersiz kayıt seçimi.", "show_admin_link": request.user.is_staff},
+        )
 
     if not work_record_ids:
-        return render(request, "core/client/istasyon_raporu.html", {"reports": [], "error": "En az bir kayıt seçin."})
+        return render(
+            request,
+            "core/client/istasyon_raporu.html",
+            {"reports": [], "error": "En az bir kayıt seçin.", "show_admin_link": request.user.is_staff},
+        )
 
     reports = get_istasyon_raporu_data_by_work_records(work_record_ids, facility_ids_allowed=facility_ids)
 
@@ -496,9 +519,17 @@ def client_istasyon_raporu(request):
             error_msg = "Seçilen iş kayıtlarının tesisi erişim yetkiniz dışında."
         else:
             error_msg = "Seçilen kayıtlara ait tesiste bölge veya istasyon tanımı bulunamadı."
-        return render(request, "core/client/istasyon_raporu.html", {"reports": [], "error": error_msg})
+        return render(
+            request,
+            "core/client/istasyon_raporu.html",
+            {"reports": [], "error": error_msg, "show_admin_link": request.user.is_staff},
+        )
 
-    return render(request, "core/client/istasyon_raporu.html", {"reports": reports, "error": None})
+    return render(
+        request,
+        "core/client/istasyon_raporu.html",
+        {"reports": reports, "error": None, "show_admin_link": request.user.is_staff},
+    )
 
 
 # --- Müşteriler ---
