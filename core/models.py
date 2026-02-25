@@ -1,14 +1,21 @@
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 
 
 class UserProfile(models.Model):
-    """Kullanıcı profil fotoğrafı ve opsiyonel müşteri bağlantısı (kare, admin'de kırparak yüklenir)."""
+    """Kullanıcı profil fotoğrafı ve opsiyonel müşteri/tesis bağlantısı (kare, admin'de kırparak yüklenir)."""
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="profile",
         verbose_name="Kullanıcı",
+    )
+    is_client = models.BooleanField(
+        "Müşteri tarafı kullanıcı",
+        default=False,
+        blank=True,
+        help_text="Bu kullanıcı müşteri portalına erişebilir.",
     )
     customer = models.ForeignKey(
         "Customer",
@@ -16,8 +23,17 @@ class UserProfile(models.Model):
         null=True,
         blank=True,
         related_name="user_profiles",
-        verbose_name="Geçerli müşteri",
-        help_text="Bu kullanıcının bağlı olduğu müşteri (opsiyonel).",
+        verbose_name="Müşteri",
+        help_text="Bu kullanıcının bağlı olduğu müşteri (opsiyonel). Tesis boşsa müşterinin tüm tesislerini görebilir.",
+    )
+    facility = models.ForeignKey(
+        "Facility",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="user_profiles",
+        verbose_name="Tesis",
+        help_text="Belirli bir tesisle sınırlamak için (opsiyonel). Boşsa müşterinin tüm tesislerini görebilir.",
     )
     avatar = models.ImageField(
         "Profil fotoğrafı",
@@ -33,6 +49,27 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.get_username()} profili"
+
+    def clean(self):
+        super().clean()
+        if self.facility_id and self.customer_id and self.facility.customer_id != self.customer_id:
+            raise ValidationError(
+                {"facility": "Seçilen tesis, seçilen müşteriye ait olmalıdır."}
+            )
+
+    def get_visible_facilities(self):
+        """
+        Müşteri tarafı kullanıcının görebileceği tesisleri döndürür.
+        - Tesis tanımlıysa: sadece o tesis
+        - Sadece müşteri tanımlıysa: müşterinin tüm tesisleri
+        - İkisi de boşsa: boş queryset
+        """
+        Facility = self._meta.get_field("facility").related_model
+        if self.facility_id:
+            return Facility.objects.filter(pk=self.facility_id)
+        if self.customer_id:
+            return Facility.objects.filter(customer_id=self.customer_id).order_by("kod")
+        return Facility.objects.none()
 
 
 class Customer(models.Model):
@@ -769,7 +806,13 @@ class WorkRecordStationCount(models.Model):
 
 
 class BagimsizTespit(models.Model):
-    """Bağımsız tespit kaydı. Tarih, firma, tesis, yer/gözlem açıklaması, öneriler, raporlandı ve 3 görsel."""
+    """Bağımsız tespit kaydı. Tarih, firma, tesis, durum, çözümlenme tarihi, yer/gözlem açıklaması, öneriler, raporlandı ve 3 görsel."""
+    DURUM_TESPIT_EDILDI = "tespit_edildi"
+    DURUM_COZULDU = "cozuldu"
+    DURUM_CHOICES = [
+        (DURUM_TESPIT_EDILDI, "Tespit edildi"),
+        (DURUM_COZULDU, "Çözüldü"),
+    ]
     tarih = models.DateField("Tarih")
     firma = models.ForeignKey(
         Customer,
@@ -785,6 +828,13 @@ class BagimsizTespit(models.Model):
         related_name="bagimsiz_tespitler",
         verbose_name="Tesis",
     )
+    durum = models.CharField(
+        "Durum",
+        max_length=20,
+        choices=DURUM_CHOICES,
+        default=DURUM_TESPIT_EDILDI,
+    )
+    cozumlenme_tarihi = models.DateField("Çözümlenme tarihi", null=True, blank=True)
     yer_aciklamasi = models.TextField("Yer açıklaması", blank=True)
     gozlem_aciklamasi = models.TextField("Gözlem açıklaması", blank=True)
     oneriler = models.TextField("Öneriler", blank=True)

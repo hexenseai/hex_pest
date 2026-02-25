@@ -1,0 +1,185 @@
+{% extends "base_app.html" %}
+
+{% block title %}İstasyon Raporu - Kale İlaçlama{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">İstasyon Raporu</h1>
+        <a href="{% url 'client_work_record_list' %}" class="text-blue-600 hover:underline text-sm">← Faaliyet kayıtlarına dön</a>
+    </div>
+
+    {% if error %}
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <p class="font-medium text-amber-800">{{ error }}</p>
+            <p class="text-sm text-amber-700 mt-2">Raporun görüntülenebilmesi için: iş kaydında tesis bilgisi olmalı, tesisin bölge ve istasyon tanımları yapılmış olmalı. İstasyon sayımı (Var/Yok) admin panelinden iş kaydına girilmiş olmalı.</p>
+        </div>
+    {% else %}
+        {{ reports|json_script:"reports-data" }}
+        {% for report in reports %}
+        <div class="mb-10">
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">{{ report.facility_name }}</h2>
+            {% if report.adres %}<p class="text-sm text-gray-500 mb-4">{{ report.adres }}</p>{% endif %}
+
+            {% with data=report.data %}
+            {# Genel tüketim oranı grafiği #}
+            {% if data.ratio_genel %}
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">Genel tüketim oranı (tarih bazlı)</h3>
+                <div class="h-64">
+                    <canvas id="chart-genel-{{ report.facility_id }}"></canvas>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Bölge bazlı tüketim oranları grafiği #}
+            {% if data.ratio_by_zone %}
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">Bölge bazlı tüketim oranları</h3>
+                <div class="h-64">
+                    <canvas id="chart-zone-{{ report.facility_id }}"></canvas>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Bölge istatistikleri #}
+            {% if data.zone_stats %}
+            <div class="mb-6 overflow-x-auto">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">Bölge istatistikleri (ilk-son kayıt karşılaştırması)</h3>
+                <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-sm font-medium text-gray-700">Bölge</th>
+                            <th class="px-4 py-2 text-right text-sm font-medium text-gray-700">Tüketim değişim</th>
+                            <th class="px-4 py-2 text-right text-sm font-medium text-gray-700">İstasyon değişimi</th>
+                            <th class="px-4 py-2 text-right text-sm font-medium text-gray-700">Var (ilk)</th>
+                            <th class="px-4 py-2 text-right text-sm font-medium text-gray-700">Var (son)</th>
+                            <th class="px-4 py-2 text-right text-sm font-medium text-gray-700">Toplam istasyon</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in data.zone_stats %}
+                        <tr class="border-t border-gray-200 hover:bg-gray-50">
+                            <td class="px-4 py-2 text-sm">{{ s.zone }}</td>
+                            <td class="px-4 py-2 text-sm text-right">{% if s.tuketim_degisim >= 0 %}<span class="text-green-600">{% else %}<span class="text-red-600">{% endif %}{{ s.tuketim_degisim|floatformat:1 }}%</span></td>
+                            <td class="px-4 py-2 text-sm text-right">{{ s.istasyon_degisim|floatformat:1 }}%</td>
+                            <td class="px-4 py-2 text-sm text-right">{{ s.var_ilk }}</td>
+                            <td class="px-4 py-2 text-sm text-right">{{ s.var_son }}</td>
+                            <td class="px-4 py-2 text-sm text-right">{{ s.zone_total }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            {# İstasyon detay tablosu #}
+            <div class="overflow-x-auto">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">İstasyon tüketim durumu (Var/Yok)</h3>
+                <table class="min-w-full border border-gray-200 rounded-lg overflow-hidden text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700">Bölge</th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700">Kod</th>
+                            <th class="px-3 py-2 text-left font-medium text-gray-700">Açıklama</th>
+                            {% for h in data.date_headers %}
+                            <th class="px-3 py-2 text-center font-medium text-gray-700">{{ h }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data.rows %}
+                        <tr class="border-t border-gray-200 hover:bg-gray-50">
+                            <td class="px-3 py-2">{{ row.zone }}</td>
+                            <td class="px-3 py-2 font-mono">{{ row.kod }}</td>
+                            <td class="px-3 py-2">{{ row.ad }}</td>
+                            {% for c in row.counts %}
+                            <td class="px-3 py-2 text-center">
+                                {% if c == True %}<span class="text-green-600 font-medium">Var</span>{% elif c == False %}<span class="text-gray-400">Yok</span>{% else %}—{% endif %}
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endwith %}
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+{% if reports %}
+<script>
+(function() {
+    var el = document.getElementById("reports-data");
+    if (!el) return;
+    var reports = JSON.parse(el.textContent);
+    reports.forEach(function(r) {
+        var d = r.data;
+        var fid = r.facility_id;
+        if (d.ratio_genel && d.date_headers && d.date_headers.length) {
+            var ctx = document.getElementById("chart-genel-" + fid);
+            if (ctx) {
+                new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: d.date_headers,
+                        datasets: [{
+                            label: "Tüketim oranı (%)",
+                            data: d.ratio_genel.map(function(v) { return Math.round((v || 0) * 1000) / 10; }),
+                            borderColor: "rgb(59, 130, 246)",
+                            backgroundColor: "rgba(59, 130, 246, 0.1)",
+                            fill: true,
+                            tension: 0.2,
+                        }],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { min: 0, max: 100, ticks: { callback: function(v) { return v + "%"; } } },
+                        },
+                    },
+                });
+            }
+        }
+        if (d.ratio_by_zone && d.date_headers) {
+            var ctx = document.getElementById("chart-zone-" + fid);
+            if (ctx) {
+                var colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+                var datasets = [];
+                var idx = 0;
+                for (var zone in d.ratio_by_zone) {
+                    datasets.push({
+                        label: zone,
+                        data: d.ratio_by_zone[zone].map(function(v) { return Math.round((v || 0) * 1000) / 10; }),
+                        borderColor: colors[idx % colors.length],
+                        backgroundColor: "transparent",
+                        fill: false,
+                        tension: 0.2,
+                    });
+                    idx++;
+                }
+                new Chart(ctx, {
+                    type: "line",
+                    data: { labels: d.date_headers, datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { min: 0, max: 100, ticks: { callback: function(v) { return v + "%"; } } },
+                        },
+                    },
+                });
+            }
+        }
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

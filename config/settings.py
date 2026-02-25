@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 
 import environ
+from django.templatetags.static import static
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -77,6 +78,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.user_profile',
             ],
         },
     },
@@ -160,6 +162,12 @@ LOGOUT_REDIRECT_URL = '/login/'
 UNFOLD = {
     "SITE_HEADER": "Kale İlaçlama",
     "SITE_LOGO": "/static/logo.png",
+    "STYLES": [
+        lambda request: static("css/admin-mobile.css"),
+    ],
+    "SCRIPTS": [
+        lambda request: static("js/admin-select2-mobile.js"),
+    ],
     "SIDEBAR": {
         "show_search": False,
         "show_all_applications": False,

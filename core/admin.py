@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.admin import UserAdmin as AuthUserAdmin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.db import models
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -10,8 +10,9 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from unfold.admin import ModelAdmin, TabularInline
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
-from .forms import StationForm, ZoneForm, TalepAdminForm
+from .forms import StationForm, ZoneForm, TalepAdminForm, UserProfileAdminForm
 from django.core.files.base import ContentFile
 
 from .models import (
@@ -129,11 +130,12 @@ class WorkRecordIlacInline(TabularInline):
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
+    form = UserProfileAdminForm
     fk_name = "user"
     max_num = 1
     can_delete = True
-    fields = ("customer", "avatar")
-    autocomplete_fields = ["customer"]
+    fields = ("is_client", "customer", "facility", "avatar")
+    autocomplete_fields = ["customer", "facility"]
     formfield_overrides = {models.ImageField: {"widget": ImageCropInput}}
 
     class Media:
@@ -177,6 +179,21 @@ class FacilityAdmin(ModelAdmin):
     search_fields = ("kod", "ad", "customer__kod")
     autocomplete_fields = ["customer"]
     inlines = [FacilityContactInline, ZoneInline]
+
+    def get_search_results(self, request, queryset, search_term):
+        qs, use_distinct = super().get_search_results(request, queryset, search_term)
+        # İş kaydı formundan facility autocomplete: müşteri seçilmeden tesis gösterme
+        if (
+            request.GET.get("app_label") == "core"
+            and request.GET.get("model_name") == "workrecord"
+            and request.GET.get("field_name") == "facility"
+        ):
+            customer_id = request.GET.get("customer_id", "").strip()
+            if customer_id:
+                qs = qs.filter(customer_id=customer_id)
+            else:
+                qs = qs.none()
+        return qs, use_distinct
 
     def istasyonlar_link(self, obj):
         if obj.pk:
@@ -357,6 +374,25 @@ class TespitTanimAdmin(ModelAdmin):
     search_fields = ("ad",)
 
 
+class WorkRecordBaslatmaBitisFilter(admin.SimpleListFilter):
+    """İş kayıtları listesinde başlatma/bitiş durumuna göre filtre."""
+    title = "Görüntüleme"
+    parameter_name = "baslatma_bitis"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("aktif", "Aktif (başlatılmamış veya bitirilmemiş)"),
+            ("tumu", "Tümü"),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == "tumu":
+            return queryset
+        if self.value() == "aktif":
+            return queryset.filter(Q(baslama_saati__isnull=True) | Q(bitis_saati__isnull=True))
+        return queryset
+
+
 @admin.register(WorkRecord)
 class WorkRecordAdmin(ModelAdmin):
     formfield_overrides = {
@@ -371,6 +407,7 @@ class WorkRecordAdmin(ModelAdmin):
     )
     actions = ["faaliyet_raporu_olustur", "baslat_action", "bitir_action"]
     list_filter = (
+        WorkRecordBaslatmaBitisFilter,
         "tarih", "durum", "customer", "personel", "ekip", "gozlem_ziyareti_yapilmali", "sozlesme_disi_islem_var",
         "skb", "atomizor", "pulverizator", "termal_sis", "ar_uz_ulv", "elk_ulv", "civi_tabancasi",
         "created_at",
@@ -386,6 +423,13 @@ class WorkRecordAdmin(ModelAdmin):
         WorkRecordStationCountInline,
     ]
     date_hierarchy = "tarih"
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.GET.get("baslatma_bitis") == "tumu":
+            return qs
+        return qs.filter(Q(baslama_saati__isnull=True) | Q(bitis_saati__isnull=True))
+
     fieldsets = (
         (None, {
             "fields": (
@@ -437,6 +481,9 @@ class WorkRecordAdmin(ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     change_form_template = "admin/core/workrecord/change_form.html"
+
+    class Media:
+        js = ("core/js/workrecord_facility_filter.js",)
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
@@ -634,12 +681,12 @@ class WorkRecordAdmin(ModelAdmin):
         if obj is None or not obj.pk:
             return "—"
         links = []
-        if obj.durum == WorkRecord.DURUM_BASLANMADI:
+        if obj.baslama_saati is None:
             url = reverse("admin:core_workrecord_baslat", args=[obj.pk])
             links.append(
                 f'<a href="{url}" class="inline-flex items-center px-2 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-700 no-underline">Başlat</a>'
             )
-        elif obj.durum == WorkRecord.DURUM_DEVAM_EDIYOR:
+        elif obj.bitis_saati is None:
             url = reverse("admin:core_workrecord_bitir", args=[obj.pk])
             links.append(
                 f'<a href="{url}" class="inline-flex items-center px-2 py-1 text-xs rounded bg-amber-600 text-white hover:bg-amber-700 no-underline">Bitir</a>'
@@ -1111,9 +1158,23 @@ class BagimsizTespitAdmin(ModelAdmin):
         return response
 
 
-# Kullanıcı admin: profil fotoğrafı (avatar) inline + kare kırpma
-class CustomUserAdmin(AuthUserAdmin):
+# Kullanıcı admin: Unfold ModelAdmin + profil fotoğrafı (avatar) inline + kare kırpma
+class CustomUserAdmin(BaseUserAdmin, ModelAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
     inlines = [UserProfileInline]
+
+    def save_formset(self, request, form, formset, change):
+        # Yeni kullanıcı eklenirken: post_save sinyali zaten UserProfile oluşturuyor.
+        # Formset'in yeni oluşturmaya çalışması UNIQUE hatası verir. Mevcut profili kullan.
+        if not change and formset.model == UserProfile:
+            user = form.instance
+            for f in formset.forms:
+                if not f.instance.pk:
+                    profile, _ = UserProfile.objects.get_or_create(user=user)
+                    f.instance = profile
+        formset.save()
 
     class Media:
         css = {"all": ("https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.css",)}

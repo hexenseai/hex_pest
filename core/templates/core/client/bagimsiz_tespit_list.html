@@ -1,0 +1,101 @@
+{% extends "base_app.html" %}
+
+{% block title %}Bağımsız Tespitler - Kale İlaçlama{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Bağımsız Tespitler</h1>
+
+    {% if not tespitler %}
+        <p class="text-gray-600">Görüntüleyebileceğiniz bağımsız tespit kaydı bulunmuyor.</p>
+    {% else %}
+        <div class="space-y-4">
+            {% for t in tespitler %}
+            <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                <button type="button"
+                        class="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-gray-50 transition"
+                        onclick="toggleTespit('tespit-{{ t.pk }}')"
+                        aria-expanded="false"
+                        aria-controls="tespit-{{ t.pk }}">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-medium text-gray-900">{{ t.tarih|date:"d.m.Y" }}</span>
+                            <span class="text-gray-400">·</span>
+                            <span class="text-sm text-gray-600">{% if t.tesis %}{{ t.tesis.ad }}{% else %}Tüm tesisler{% endif %}</span>
+                            {% if t.raporlandi %}
+                                <span class="px-2 py-0.5 text-xs font-medium rounded bg-green-100 text-green-800">Raporlandı</span>
+                            {% endif %}
+                        </div>
+                        {% if t.yer_aciklamasi %}
+                            <p class="text-sm text-gray-500 mt-1 truncate">{{ t.yer_aciklamasi }}</p>
+                        {% endif %}
+                    </div>
+                    <svg id="icon-tespit-{{ t.pk }}" class="w-5 h-5 text-gray-400 flex-shrink-0 ml-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+
+                <div id="tespit-{{ t.pk }}" class="hidden border-t border-gray-100">
+                    <div class="p-4 bg-gray-50/50 space-y-4 text-sm">
+                        {% if t.yer_aciklamasi %}
+                            <div>
+                                <span class="font-medium text-gray-700">Yer açıklaması:</span>
+                                <p class="text-gray-600 mt-0.5 whitespace-pre-wrap">{{ t.yer_aciklamasi }}</p>
+                            </div>
+                        {% endif %}
+                        {% if t.gozlem_aciklamasi %}
+                            <div>
+                                <span class="font-medium text-gray-700">Gözlem açıklaması:</span>
+                                <p class="text-gray-600 mt-0.5 whitespace-pre-wrap">{{ t.gozlem_aciklamasi }}</p>
+                            </div>
+                        {% endif %}
+                        {% if t.oneriler %}
+                            <div>
+                                <span class="font-medium text-gray-700">Öneriler:</span>
+                                <p class="text-gray-600 mt-0.5 whitespace-pre-wrap">{{ t.oneriler }}</p>
+                            </div>
+                        {% endif %}
+                        {% if t.gorsel1 or t.gorsel2 or t.gorsel3 %}
+                            <div class="flex flex-wrap gap-3">
+                                {% if t.gorsel1 %}
+                                    <a href="{{ t.gorsel1.url }}" target="_blank" rel="noopener" class="block">
+                                        <img src="{{ t.gorsel1.url }}" alt="Görsel 1" class="rounded border border-gray-200 max-h-40 object-cover hover:opacity-90">
+                                    </a>
+                                {% endif %}
+                                {% if t.gorsel2 %}
+                                    <a href="{{ t.gorsel2.url }}" target="_blank" rel="noopener" class="block">
+                                        <img src="{{ t.gorsel2.url }}" alt="Görsel 2" class="rounded border border-gray-200 max-h-40 object-cover hover:opacity-90">
+                                    </a>
+                                {% endif %}
+                                {% if t.gorsel3 %}
+                                    <a href="{{ t.gorsel3.url }}" target="_blank" rel="noopener" class="block">
+                                        <img src="{{ t.gorsel3.url }}" alt="Görsel 3" class="rounded border border-gray-200 max-h-40 object-cover hover:opacity-90">
+                                    </a>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+<script>
+function toggleTespit(id) {
+    var el = document.getElementById(id);
+    var btn = el.previousElementSibling;
+    var icon = document.getElementById('icon-' + id);
+    if (el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        el.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+</script>
+{% endblock %}

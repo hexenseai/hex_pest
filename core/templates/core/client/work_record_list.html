@@ -1,0 +1,186 @@
+{% extends "base_app.html" %}
+
+{% block title %}Faaliyet Kayıtları - Kale İlaçlama{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl">
+    <h1 class="text-2xl font-bold text-gray-900 mb-4">Faaliyet Kayıtları</h1>
+
+    {# Arama ve filtre #}
+    <div class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+        <form method="get" action="{% url 'client_work_record_list' %}" class="flex flex-wrap items-end gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <label for="q" class="block text-sm font-medium text-gray-700 mb-1">Ara</label>
+                <input type="text" name="q" id="q" value="{{ q }}"
+                       placeholder="Form no, müşteri, tesis, personel..."
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+            </div>
+            {% if facilities|length > 1 %}
+            <div>
+                <label for="facility" class="block text-sm font-medium text-gray-700 mb-1">Tesis</label>
+                <select name="facility" id="facility" class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+                    <option value="">Tümü</option>
+                    {% for f in facilities %}
+                    <option value="{{ f.pk }}" {% if facility_filter == f.pk|stringformat:"d" %}selected{% endif %}>{{ f.customer.kod }}-{{ f.kod }} {{ f.ad }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm font-medium">
+                Uygula
+            </button>
+        </form>
+    </div>
+
+    {# İstasyon raporu butonu #}
+    <div class="mb-4 flex items-center gap-4">
+        <button type="button" id="btn-istasyon-raporu" disabled
+                class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
+            İstasyon raporu görüntüle
+        </button>
+        <span id="selection-hint" class="text-sm text-gray-500">Rapor için kutucukları işaretleyin • Detay için "Görüntüle" butonuna tıklayın</span>
+    </div>
+
+    {% if not table_data %}
+        <p class="text-gray-600">Görüntüleyebileceğiniz faaliyet kaydı bulunmuyor.</p>
+    {% else %}
+        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <div id="work-record-tabulator"></div>
+        </div>
+    {% endif %}
+</div>
+
+{# Detay modal #}
+<div id="detail-modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50" onclick="closeDetailModal()"></div>
+    <div class="absolute inset-4 md:inset-10 lg:inset-20 bg-white rounded-lg shadow-xl overflow-hidden flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b">
+            <h2 class="text-lg font-semibold">Faaliyet Kaydı Detayı</h2>
+            <button type="button" onclick="closeDetailModal()" class="p-2 text-gray-500 hover:text-gray-700">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div id="detail-content" class="flex-1 overflow-auto p-6 text-sm"></div>
+    </div>
+</div>
+
+{{ table_data|json_script:"table-data" }}
+{{ detail_data|json_script:"detail-data" }}
+{% endblock %}
+
+{% block extra_js %}
+{% if table_data %}
+<script>
+(function () {
+    var dataEl = document.getElementById("table-data");
+    var detailEl = document.getElementById("detail-data");
+    var data = dataEl ? JSON.parse(dataEl.textContent) : [];
+    var detailData = detailEl ? JSON.parse(detailEl.textContent) : {};
+    var table = new Tabulator("#work-record-tabulator", {
+        data: data,
+        selectableRows: true,
+        layout: "fitColumns",
+        responsiveLayout: "hide",
+        placeholder: "Kayıt yok",
+        columns: [
+            { formatter: "rowSelection", titleFormatter: "rowSelection", align: "center", headerSort: false, width: 50 },
+            { title: "Tarih", field: "tarih", width: 100 },
+            { title: "Form no", field: "form_no", minWidth: 120 },
+            { title: "Müşteri", field: "musteri", minWidth: 140 },
+            { title: "Tesis", field: "tesis", minWidth: 120 },
+            { title: "Personel", field: "personel", minWidth: 100 },
+            { title: "Ekip", field: "ekip", width: 80 },
+            {
+                title: "Durum",
+                field: "durum",
+                width: 110,
+                formatter: function(cell) {
+                    var key = cell.getRow().getData().durum_key;
+                    var cls = key === "tamamlandi" ? "text-green-600" : (key === "devam_ediyor" ? "text-amber-600" : "text-gray-500");
+                    return '<span class="' + cls + '">' + (cell.getValue() || "") + "</span>";
+                },
+            },
+            {
+                title: "Detay",
+                width: 80,
+                hozAlign: "center",
+                formatter: function(cell) {
+                    return '<button type="button" class="text-blue-600 hover:underline text-sm">Görüntüle</button>';
+                },
+                cellClick: function(e, cell) {
+                    e.stopPropagation();
+                    var id = cell.getRow().getData().id;
+                    var d = detailData[id];
+                    if (d) showDetailModal(d);
+                },
+            },
+        ],
+    });
+
+    table.on("rowSelectionChanged", function(data, rows) {
+        var btn = document.getElementById("btn-istasyon-raporu");
+        var hint = document.getElementById("selection-hint");
+        if (data && data.length > 0) {
+            btn.disabled = false;
+            var ids = data.map(function(r) { return r.id; }).join(",");
+            btn.onclick = function() {
+                window.location.href = "{% url 'client_istasyon_raporu' %}?ids=" + ids;
+            };
+            hint.textContent = data.length + " kayıt seçildi — İstasyon raporu görüntüle";
+        } else {
+            btn.disabled = true;
+            btn.onclick = null;
+            hint.textContent = "Rapor için kutucukları işaretleyin • Detay için \"Görüntüle\" butonuna tıklayın";
+        }
+    });
+})();
+
+function showDetailModal(d) {
+    var html = '<div class="space-y-4 max-w-2xl">';
+    html += '<div class="grid grid-cols-2 gap-4"><div><span class="text-gray-500">Tarih:</span> ' + (d.tarih || "—") + '</div>';
+    html += '<div><span class="text-gray-500">Form no:</span> ' + (d.form_numarasi || "—") + '</div>';
+    html += '<div><span class="text-gray-500">Müşteri:</span> ' + (d.musteri || "—") + '</div>';
+    html += '<div><span class="text-gray-500">Tesis:</span> ' + (d.tesis || "—") + '</div>';
+    html += '<div><span class="text-gray-500">Personel:</span> ' + (d.personel || "—") + '</div>';
+    html += '<div><span class="text-gray-500">Ekip:</span> ' + (d.ekip || "—") + '</div>';
+    html += '<div><span class="text-gray-500">Durum:</span> ' + (d.durum || "—") + '</div>';
+    html += '<div><span class="text-gray-500">Başlama:</span> ' + (d.baslama_saati || "—") + '</div>';
+    html += '<div><span class="text-gray-500">Bitiş:</span> ' + (d.bitis_saati || "—") + '</div>';
+    html += '<div class="col-span-2"><span class="text-gray-500">Bayraklar:</span> ';
+    if (d.gozlem_ziyareti_yapilmali) html += '<span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded text-xs">Gözlem ziyareti</span> ';
+    if (d.sozlesme_disi_islem_var) html += '<span class="px-2 py-0.5 bg-orange-100 text-orange-800 rounded text-xs">Sözleşme dışı</span>';
+    html += '</div>';
+    html += '<div class="col-span-2"><span class="text-gray-500">Ekipman:</span> ' + (d.ekipman || "—") + '</div>';
+    if (d.uygulamalar && d.uygulamalar.length) {
+        html += '<div class="col-span-2"><span class="text-gray-500">Yapılan uygulamalar:</span><ul class="list-disc ml-4 mt-1">';
+        d.uygulamalar.forEach(function(u) { html += '<li>' + u + '</li>'; });
+        html += '</ul></div>';
+    }
+    if (d.faaliyetler && d.faaliyetler.length) {
+        html += '<div class="col-span-2"><span class="text-gray-500">Faaliyetler:</span><ul class="list-disc ml-4 mt-1">';
+        d.faaliyetler.forEach(function(f) { html += '<li>' + f + '</li>'; });
+        html += '</ul></div>';
+    }
+    if (d.ilaclar && d.ilaclar.length) {
+        html += '<div class="col-span-2"><span class="text-gray-500">Kullanılan ilaçlar:</span><ul class="list-disc ml-4 mt-1">';
+        d.ilaclar.forEach(function(i) { html += '<li>' + i + '</li>'; });
+        html += '</ul></div>';
+    }
+    if (d.tespitler && d.tespitler.length) {
+        html += '<div class="col-span-2"><span class="text-gray-500">Tespitler:</span><ul class="list-disc ml-4 mt-1">';
+        d.tespitler.forEach(function(t) { html += '<li>' + t + '</li>'; });
+        html += '</ul></div>';
+    }
+    html += '<div class="col-span-2"><span class="text-gray-500">Öneriler:</span> ' + (d.oneriler || "—") + '</div>';
+    html += '<div class="col-span-2"><span class="text-gray-500">Not:</span> ' + (d.not_alani || "—") + '</div>';
+    html += '</div></div>';
+    document.getElementById("detail-content").innerHTML = html;
+    document.getElementById("detail-modal").classList.remove("hidden");
+}
+
+function closeDetailModal() {
+    document.getElementById("detail-modal").classList.add("hidden");
+}
+</script>
+{% endif %}
+{% endblock %}

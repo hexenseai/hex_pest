@@ -2,12 +2,254 @@
 
 {% block title %}Ana Sayfa - Kale İlaçlama{% endblock %}
 
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
 {% block content %}
-<div class="max-w-2xl">
-    <h1 class="text-2xl font-bold text-gray-900 mb-4">Ana Sayfa</h1>
-    <p class="text-gray-600 mb-6">Müşteri, tesis, bölge ve istasyon yönetimi; talep ve iş kayıtları.</p>
-    <a href="{% url 'admin:index' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700" target="_blank">
-        Yönetim paneline git
-    </a>
+<div class="max-w-6xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+
+    {# Özet kartları #}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Toplam Tesis</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ facility_count }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Faaliyet Kaydı</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ work_record_count }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500">İstasyon Sayısı</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ station_count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {# Son 3 faaliyet raporu #}
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">Son Faaliyet Kayıtları</h2>
+                <a href="{% url 'client_work_record_list' %}" class="text-sm text-blue-600 hover:underline font-medium">Tümünü gör →</a>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for w in last_3_work_records %}
+                <a href="{% url 'client_work_record_list' %}?q={{ w.form_no|urlencode }}" class="block px-5 py-3 hover:bg-gray-50 transition">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-medium text-gray-900">{{ w.form_no }}</p>
+                            <p class="text-sm text-gray-500">{{ w.tesis }} · {{ w.tarih }}</p>
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded-full {% if w.durum == 'Tamamlandı' %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-700{% endif %}">{{ w.durum }}</span>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="px-5 py-6 text-center text-gray-500 text-sm">Henüz faaliyet kaydı yok.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Tesis seçimi + Bölge tüketim (Var/Yok) pie #}
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900 mb-3">Tesis bazında bölge tüketimi</h2>
+                <label for="dashboard-facility" class="block text-sm font-medium text-gray-700 mb-1">Tesis seçin</label>
+                <select id="dashboard-facility" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="">— Tesis seçin —</option>
+                    {% for f in facilities %}
+                    <option value="{{ f.pk }}">{{ f.customer.kod }}-{{ f.kod }} {{ f.ad }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="p-5">
+                <div id="zone-pie-empty" class="flex items-center justify-center h-64 text-gray-400 text-sm">
+                    Tesis seçerek bölgelerin tüketim var/yok oranlarını görüntüleyin.
+                </div>
+                <div id="zone-pie-wrap" class="h-64 hidden">
+                    <canvas id="chart-zone-pie"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Çözülmemiş bağımsız tespitler #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-8">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Çözülmemiş bağımsız tespitler</h2>
+            <div class="flex items-center gap-3">
+                <span class="text-sm font-medium text-gray-500">Toplam: <span class="font-bold text-gray-900">{{ unresolved_bagimsiz_tespit_count }}</span></span>
+                <a href="{% url 'client_bagimsiz_tespit_list' %}" class="text-sm text-blue-600 hover:underline font-medium">Tümünü gör →</a>
+            </div>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for t in last_unresolved_bagimsiz_tespitler %}
+            <a href="{% url 'client_bagimsiz_tespit_list' %}" class="block px-5 py-3 hover:bg-gray-50 transition">
+                <p class="font-medium text-gray-900">{{ t.tarih|date:"d.m.Y" }} — {% if t.tesis %}{{ t.tesis.ad }}{% else %}Tüm tesisler{% endif %}</p>
+                {% if t.yer_aciklamasi %}<p class="text-sm text-gray-500 truncate mt-0.5">{{ t.yer_aciklamasi }}</p>{% endif %}
+            </a>
+            {% empty %}
+            <div class="px-5 py-6 text-center text-gray-500 text-sm">Çözülmemiş bağımsız tespit yok.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Tesislerin son tüketim oranları (bar chart) #}
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-semibold text-gray-900">Tesislere göre son tüketim oranı (%)</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Her tesiste son faaliyet kaydındaki istasyon tüketim oranı</p>
+        </div>
+        <div class="p-5">
+            {% if facility_consumption_rates %}
+            <div class="h-72">
+                <canvas id="chart-facility-consumption"></canvas>
+            </div>
+            {% else %}
+            <div class="flex items-center justify-center h-72 text-gray-400 text-sm">Veri yok.</div>
+            {% endif %}
+        </div>
+    </div>
 </div>
+
+{{ zone_pie_by_facility|json_script:"zone-pie-data" }}
+{{ facility_consumption_rates|json_script:"facility-rates-data" }}
+
+<script>
+(function() {
+    var zonePieEl = document.getElementById("zone-pie-data");
+    var zonePieData = zonePieEl ? JSON.parse(zonePieEl.textContent) : {};
+    var facilityRatesEl = document.getElementById("facility-rates-data");
+    var facilityRates = facilityRatesEl ? JSON.parse(facilityRatesEl.textContent) : [];
+
+    var pieEmpty = document.getElementById("zone-pie-empty");
+    var pieWrap = document.getElementById("zone-pie-wrap");
+    var selectFacility = document.getElementById("dashboard-facility");
+    var zonePieChart = null;
+
+    var PIE_COLORS = [
+        "#22c55e", "#94a3b8", "#3b82f6", "#f59e0b", "#ef4444",
+        "#8b5cf6", "#ec4899", "#14b8a6", "#eab308", "#f97316"
+    ];
+
+    function buildPie(facilityId) {
+        var data = zonePieData[String(facilityId)];
+        if (!data || !data.labels || !data.labels.length) {
+            pieEmpty.classList.remove("hidden");
+            pieWrap.classList.add("hidden");
+            if (zonePieChart) {
+                zonePieChart.destroy();
+                zonePieChart = null;
+            }
+            return;
+        }
+        pieEmpty.classList.add("hidden");
+        pieWrap.classList.remove("hidden");
+
+        var ctx = document.getElementById("chart-zone-pie");
+        if (!ctx) return;
+        if (zonePieChart) zonePieChart.destroy();
+
+        var colors = data.labels.map(function(_, i) {
+            return data.labels[i].indexOf("(Var)") >= 0 ? "#22c55e" : "#94a3b8";
+        });
+
+        zonePieChart = new Chart(ctx, {
+            type: "pie",
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.data,
+                    backgroundColor: colors,
+                    borderColor: "#fff",
+                    borderWidth: 2,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: "bottom" },
+                },
+            },
+        });
+    }
+
+    if (selectFacility) {
+        selectFacility.addEventListener("change", function() {
+            var val = this.value;
+            if (val) buildPie(val);
+            else {
+                pieEmpty.classList.remove("hidden");
+                pieWrap.classList.add("hidden");
+                if (zonePieChart) {
+                    zonePieChart.destroy();
+                    zonePieChart = null;
+                }
+            }
+        });
+    }
+
+    if (facilityRates.length) {
+        var ctx = document.getElementById("chart-facility-consumption");
+        if (ctx) {
+            new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: facilityRates.map(function(r) { return r.facility_name || "Tesis " + r.facility_id; }),
+                    datasets: [{
+                        label: "Tüketim oranı (%)",
+                        data: facilityRates.map(function(r) { return r.rate; }),
+                        backgroundColor: "rgba(59, 130, 246, 0.7)",
+                        borderColor: "rgb(59, 130, 246)",
+                        borderWidth: 1,
+                    }],
+                },
+                options: {
+                    indexAxis: "y",
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            min: 0,
+                            max: 100,
+                            ticks: { callback: function(v) { return v + "%"; } },
+                        },
+                    },
+                    plugins: {
+                        legend: { display: false },
+                    },
+                },
+            });
+        }
+    }
+})();
+</script>
 {% endblock %}

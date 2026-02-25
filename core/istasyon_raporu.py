@@ -45,6 +45,118 @@ class IstasyonRaporuForm(forms.Form):
         return data
 
 
+def get_istasyon_raporu_data_by_work_records(work_record_ids, facility_ids_allowed=None):
+    """
+    Seçili iş kayıtlarına göre istasyon raporu verisi döndürür.
+    work_record_ids: İş kaydı ID listesi
+    facility_ids_allowed: İzin verilen tesis ID'leri (müşteri portalı için). None ise tümü.
+    Dönüş: [{"facility_id", "facility_name", "adres", "data": {...}}, ...]
+    """
+    from collections import defaultdict
+
+    if not work_record_ids:
+        return []
+
+    wrs = list(
+        WorkRecord.objects.filter(pk__in=work_record_ids)
+        .select_related("facility", "customer", "kapatilan_talep", "kapatilan_talep__facility", "kapatilan_talep__customer")
+        .order_by("tarih")
+    )
+    # Tesis ID'ye göre grupla (wr.facility veya kapatilan_talep.facility)
+    by_facility = defaultdict(list)
+    for wr in wrs:
+        fac = wr.facility or (wr.kapatilan_talep.facility if wr.kapatilan_talep_id else None)
+        if fac and (facility_ids_allowed is None or fac.id in facility_ids_allowed):
+            by_facility[fac.id].append(wr)
+
+    result = []
+    for facility_id, wr_list in by_facility.items():
+        wr_ids = [wr.id for wr in wr_list]
+        facility = Facility.objects.select_related("customer").get(pk=facility_id)
+        customer = facility.customer
+        musteri_tesis = f"{customer.firma_ismi} - {facility.ad}"
+        adres = (facility.adres or "").strip() or (customer.adres or "").strip() or "—"
+
+        stations = list(
+            Station.objects.filter(zone__facility_id=facility_id)
+            .select_related("zone")
+            .order_by("zone__kod", "kod")
+        )
+        station_ids = [s.id for s in stations]
+        counts_qs = WorkRecordStationCount.objects.filter(
+            work_record_id__in=wr_ids,
+            station_id__in=station_ids,
+        ).values_list("work_record_id", "station_id", "tuketim_var")
+        count_map = {(wr_id, st_id): val for wr_id, st_id, val in counts_qs}
+
+        date_headers = [wr.tarih.strftime("%d.%m.%Y") for wr in wr_list]
+        rows = []
+        for station in stations:
+            counts = [count_map.get((wr.id, station.id)) for wr in wr_list]
+            zone_name = str(station.zone) if station.zone else "—"
+            rows.append({"zone": zone_name, "kod": station.kod, "ad": station.ad or "", "counts": counts})
+
+        total_stations = len(stations)
+        ratio_genel = []
+        for wr in wr_list:
+            var_count = sum(1 for st in stations if count_map.get((wr.id, st.id)) is True)
+            ratio_genel.append(var_count / total_stations if total_stations else 0)
+
+        zone_stations = defaultdict(list)
+        for station in stations:
+            zone_name = str(station.zone) if station.zone else "—"
+            zone_stations[zone_name].append(station)
+
+        ratio_by_zone = {}
+        for zone_name, st_list in zone_stations.items():
+            zone_total = len(st_list)
+            ratios = []
+            for wr in wr_list:
+                var_count = sum(1 for st in st_list if count_map.get((wr.id, st.id)) is True)
+                ratios.append(var_count / zone_total if zone_total else 0)
+            ratio_by_zone[zone_name] = ratios
+
+        zone_stats = []
+        if len(wr_list) >= 2:
+            for zone_name in sorted(zone_stations.keys()):
+                st_list = zone_stations[zone_name]
+                zone_total = len(st_list)
+                if zone_total == 0:
+                    continue
+                var_ilk = sum(1 for st in st_list if count_map.get((wr_list[0].id, st.id)) is True)
+                var_son = sum(1 for st in st_list if count_map.get((wr_list[-1].id, st.id)) is True)
+                if var_ilk > 0:
+                    tuketim_degisim = ((var_son - var_ilk) / var_ilk) * 100
+                else:
+                    tuketim_degisim = (var_son * 100) if var_son > 0 else 0
+                degisen = sum(1 for st in st_list if (count_map.get((wr_list[0].id, st.id)) is True) != (count_map.get((wr_list[-1].id, st.id)) is True))
+                istasyon_degisim = (degisen / zone_total * 100) if zone_total else 0
+                zone_stats.append({
+                    "zone": zone_name,
+                    "tuketim_degisim": tuketim_degisim,
+                    "istasyon_degisim": istasyon_degisim,
+                    "var_ilk": var_ilk,
+                    "var_son": var_son,
+                    "zone_total": zone_total,
+                })
+
+        result.append({
+            "facility_id": facility_id,
+            "facility_name": musteri_tesis,
+            "adres": adres,
+            "data": {
+                "musteri_tesis": musteri_tesis,
+                "adres": adres,
+                "date_headers": date_headers,
+                "rows": rows,
+                "ratio_genel": ratio_genel,
+                "ratio_by_zone": ratio_by_zone,
+                "zone_stats": zone_stats,
+            },
+        })
+    return result
+
+
 def get_istasyon_raporu_data(facility_id, start_date, end_date):
     """
     Tesis ve tarih aralığına göre rapor verisini döndürür.

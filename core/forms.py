@@ -2,7 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 from django.utils import timezone
 
-from .models import Customer, Facility, Zone, Station, Talep
+from .models import Customer, Facility, Zone, Station, Talep, UserProfile
 
 
 class CustomerForm(forms.ModelForm):
@@ -75,6 +75,34 @@ FacilityFormSet = inlineformset_factory(
     can_delete=True,
     min_num=0,
 )
+
+
+class UserProfileAdminForm(forms.ModelForm):
+    """Admin UserProfile formu: tesis seçenekleri müşteriye göre filtrelenir."""
+    class Meta:
+        model = UserProfile
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "facility" in self.fields:
+            customer_id = None
+            if self.instance and self.instance.customer_id:
+                customer_id = self.instance.customer_id
+            elif self.data:
+                for key in self.data:
+                    if key.endswith("-customer") and self.data[key]:
+                        try:
+                            customer_id = int(self.data[key])
+                            break
+                        except (ValueError, TypeError):
+                            pass
+            if customer_id:
+                self.fields["facility"].queryset = Facility.objects.filter(
+                    customer_id=customer_id
+                ).order_by("kod")
+            else:
+                self.fields["facility"].queryset = Facility.objects.none()
 
 
 class TalepAdminForm(forms.ModelForm):

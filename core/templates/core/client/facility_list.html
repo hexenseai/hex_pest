@@ -1,0 +1,79 @@
+{% extends "base_app.html" %}
+
+{% block title %}Tesisler - Kale İlaçlama{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Tesisler</h1>
+
+    {% if not facilities %}
+        <p class="text-gray-600">Görüntüleyebileceğiniz tesis bulunmuyor.</p>
+    {% else %}
+        <div class="space-y-4">
+            {% for facility in facilities %}
+            <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                {# Tesis başlığı - tıklanabilir açılır alan #}
+                <button type="button"
+                        class="w-full flex items-center justify-between px-4 py-4 text-left hover:bg-gray-50 transition"
+                        onclick="toggleFacility('facility-{{ facility.pk }}')"
+                        aria-expanded="false"
+                        aria-controls="facility-{{ facility.pk }}">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900">{{ facility.customer.kod }}-{{ facility.kod }} {{ facility.ad }}</h2>
+                        {% if facility.adres %}
+                            <p class="text-sm text-gray-500 mt-0.5">{{ facility.adres|truncatewords:15 }}</p>
+                        {% endif %}
+                    </div>
+                    <svg id="icon-facility-{{ facility.pk }}" class="w-5 h-5 text-gray-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+
+                {# Açılır içerik: Bölgeler ve İstasyonlar #}
+                <div id="facility-{{ facility.pk }}" class="hidden border-t border-gray-100">
+                    <div class="p-4 bg-gray-50/50">
+                        {% for zone in facility.bolgeler.all %}
+                        <div class="mb-4 last:mb-0">
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">{{ zone.kod }} — {{ zone.ad }}</h3>
+                            {% if zone.istasyonlar.all %}
+                            <ul class="space-y-1.5 ml-2">
+                                {% for station in zone.istasyonlar.all %}
+                                <li class="flex items-center gap-2 text-sm text-gray-600">
+                                    <span class="text-gray-400">•</span>
+                                    <span class="font-mono text-gray-700">{{ station.benzersiz_kod|default:station.kod }}</span>
+                                    <span>— {{ station.ad }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% else %}
+                            <p class="text-sm text-gray-500 ml-2 italic">İstasyon yok</p>
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <p class="text-sm text-gray-500 italic">Bu tesiste bölge tanımlanmamış.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+<script>
+function toggleFacility(id) {
+    var el = document.getElementById(id);
+    var btn = el.previousElementSibling;
+    var icon = document.getElementById('icon-' + id);
+    if (el.classList.contains('hidden')) {
+        el.classList.remove('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        el.classList.add('hidden');
+        btn.setAttribute('aria-expanded', 'false');
+        icon.style.transform = 'rotate(0deg)';
+    }
+}
+</script>
+{% endblock %}
