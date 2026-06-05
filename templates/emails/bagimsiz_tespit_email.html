@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f6f9fc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-font-smoothing: antialiased;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="table-layout: fixed;">
+        <tr>
+            <td align="center" style="padding: 40px 10px 40px 10px; background-color: #f6f9fc;">
+                <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); border: 1px solid #e1e8ed;">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="padding: 30px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">KALE İLAÇLAMA</h1>
+                            <p style="color: #d1fae5; margin: 5px 0 0 0; font-size: 14px; font-weight: 500;">Yeni Bağımsız Tespit Raporu</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px; color: #334155; font-size: 16px; line-height: 24px;">
+                            <p style="margin-top: 0; margin-bottom: 20px; font-size: 17px; font-weight: 600;">Sayın Yetkili,</p>
+                            <p style="margin-top: 0; margin-bottom: 30px;">Tesislerinizde gerçekleştirilen bağımsız kontrol sonucunda yeni bir tespit kaydı oluşturulmuştur. Detaylar aşağıda bilginize sunulmuştur:</p>
+                            
+                            <!-- Detail Card -->
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 30px;">
+                                <tr>
+                                    <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; width: 140px; font-weight: 600; color: #64748b;">Tarih</td>
+                                    <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a;">{{ tespit.tarih|date:"d.m.Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b;">Firma (Müşteri)</td>
+                                    <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a;">{{ customer.firma_ismi }}</td>
+                                </tr>
+                                {% if facility %}
+                                <tr>
+                                    <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; font-weight: 600; color: #64748b;">Tesis</td>
+                                    <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; color: #0f172a;">{{ facility.ad }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td style="padding: 16px; font-weight: 600; color: #64748b;">Durum</td>
+                                    <td style="padding: 16px; color: #0f172a;">
+                                        <span style="background-color: #d1fae5; color: #065f46; padding: 4px 10px; border-radius: 9999px; font-size: 13px; font-weight: 600;">
+                                            {{ tespit.get_durum_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Explanations -->
+                            {% if tespit.yer_aciklamasi %}
+                            <div style="margin-bottom: 25px;">
+                                <h3 style="margin: 0 0 8px 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Yer Açıklaması</h3>
+                                <div style="background-color: #ffffff; border-left: 4px solid #10b981; padding: 10px 15px; margin: 0; color: #1e293b; font-size: 15px; border-top: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; border-radius: 0 6px 6px 0;">
+                                    {{ tespit.yer_aciklamasi|linebreaksbr }}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if tespit.gozlem_aciklamasi %}
+                            <div style="margin-bottom: 25px;">
+                                <h3 style="margin: 0 0 8px 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Gözlem Açıklaması</h3>
+                                <div style="background-color: #ffffff; border-left: 4px solid #3b82f6; padding: 10px 15px; margin: 0; color: #1e293b; font-size: 15px; border-top: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; border-radius: 0 6px 6px 0;">
+                                    {{ tespit.gozlem_aciklamasi|linebreaksbr }}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if tespit.oneriler %}
+                            <div style="margin-bottom: 30px;">
+                                <h3 style="margin: 0 0 8px 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">Öneriler</h3>
+                                <div style="background-color: #ffffff; border-left: 4px solid #f59e0b; padding: 10px 15px; margin: 0; color: #1e293b; font-size: 15px; border-top: 1px solid #f1f5f9; border-right: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9; border-radius: 0 6px 6px 0;">
+                                    {{ tespit.oneriler|linebreaksbr }}
+                                </div>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Visuals Section -->
+                            {% if tespit.gorsel1 or tespit.gorsel2 or tespit.gorsel3 %}
+                            <div style="margin-bottom: 10px;">
+                                <h3 style="margin: 0 0 15px 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b;">İlgili Görseller</h3>
+                                <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                    <tr>
+                                        {% if tespit.gorsel1 %}
+                                        <td align="center" style="padding: 5px; width: 33%;">
+                                            <img src="cid:gorsel1" alt="Görsel 1" style="width: 100%; max-width: 170px; height: 120px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; display: block;" />
+                                        </td>
+                                        {% endif %}
+                                        {% if tespit.gorsel2 %}
+                                        <td align="center" style="padding: 5px; width: 33%;">
+                                            <img src="cid:gorsel2" alt="Görsel 2" style="width: 100%; max-width: 170px; height: 120px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; display: block;" />
+                                        </td>
+                                        {% endif %}
+                                        {% if tespit.gorsel3 %}
+                                        <td align="center" style="padding: 5px; width: 33%;">
+                                            <img src="cid:gorsel3" alt="Görsel 3" style="width: 100%; max-width: 170px; height: 120px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; display: block;" />
+                                        </td>
+                                        {% endif %}
+                                    </tr>
+                                </table>
+                            </div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding: 30px; background-color: #f8fafc; border-top: 1px solid #f1f5f9; color: #64748b; font-size: 13px; line-height: 20px;">
+                            <p style="margin: 0 0 10px 0; font-weight: 600; color: #475569;">Kale İlaçlama ve Pest Kontrol Hizmetleri</p>
+                            <p style="margin: 0 0 10px 0;">Bu e-posta tesislerinizde gerçekleştirilen bağımsız kontrol faaliyeti hakkında bilgilendirme amacıyla otomatik olarak gönderilmiştir.</p>
+                            <p style="margin: 0; font-size: 12px; color: #94a3b8;">Lütfen bu e-postayı yanıtlamayınız.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

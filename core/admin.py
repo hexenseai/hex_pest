@@ -1136,6 +1136,17 @@ class BagimsizTespitAdmin(ModelAdmin):
             return super().formfield_for_foreignkey(db_field, request, **kwargs)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
+    def save_model(self, request, obj, form, change):
+        is_new = not change
+        super().save_model(request, obj, form, change)
+        if is_new:
+            from .emails import send_bagimsiz_tespit_email
+            sent = send_bagimsiz_tespit_email(obj)
+            if sent:
+                self.message_user(request, "Müşteri iletişim adreslerine bilgilendirme e-postası gönderildi.", level=messages.SUCCESS)
+            else:
+                self.message_user(request, "Müşteri iletişim adreslerine e-posta gönderilemedi (iletişim adresi tanımlanmamış olabilir veya e-posta sunucu hatası oluştu).", level=messages.WARNING)
+
     def yer_aciklamasi_short(self, obj):
         if obj.yer_aciklamasi:
             return (obj.yer_aciklamasi[:60] + "…") if len(obj.yer_aciklamasi) > 60 else obj.yer_aciklamasi
