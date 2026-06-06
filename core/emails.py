@@ -19,7 +19,7 @@ def send_bagimsiz_tespit_email(tespit):
     
     if not emails:
         logger.warning(f"No contact email found for customer: {tespit.firma}")
-        return False
+        return None  # None = iletişim adresi yok, False = SMTP hatası
         
     subject = f"Yeni Bağımsız Tespit Kaydı Oluşturuldu - {tespit.tarih:%d.%m.%Y}"
     

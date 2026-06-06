@@ -1144,8 +1144,10 @@ class BagimsizTespitAdmin(ModelAdmin):
             sent = send_bagimsiz_tespit_email(obj)
             if sent:
                 self.message_user(request, "Müşteri iletişim adreslerine bilgilendirme e-postası gönderildi.", level=messages.SUCCESS)
+            elif sent is None:
+                self.message_user(request, f"'{obj.firma}' firmasına ait e-posta adresi tanımlı iletişim kaydı bulunamadı. Adres defterinden iletişim ekleyin.", level=messages.WARNING)
             else:
-                self.message_user(request, "Müşteri iletişim adreslerine e-posta gönderilemedi (iletişim adresi tanımlanmamış olabilir veya e-posta sunucu hatası oluştu).", level=messages.WARNING)
+                self.message_user(request, "E-posta sunucusuna bağlanılamadı. Sistem yöneticisiyle iletişime geçin.", level=messages.ERROR)
 
     def yer_aciklamasi_short(self, obj):
         if obj.yer_aciklamasi:
